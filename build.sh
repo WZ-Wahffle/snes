@@ -59,6 +59,7 @@ function build_sdl() {
 	mkdir -p raylib/src/external/SDL2/lib
 	cp tmp/libSDL2.a raylib/src/external/SDL2/lib
 	cp tmp/include/SDL2/* raylib/src/external/SDL2/include
+	cp tmp/include-config-/SDL2/* raylib/src/external/SDL2/include
 	rm -rf tmp
 }
 
