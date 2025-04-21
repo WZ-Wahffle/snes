@@ -1,9 +1,6 @@
-#include "cpu_mmu.h"
+#include "cpu.h"
 #include "ppu.h"
 #include "types.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 extern cpu_t cpu;
 
@@ -137,6 +134,7 @@ int main(int argc, char **argv) {
            cpu.memory.rom_size);
     memcpy(cpu.memory.rom, file_to_hash, file_size);
     cpu.memory.mode = mode;
+    reset();
     ui();
 
     free(cpu.memory.ram);

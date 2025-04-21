@@ -1,13 +1,14 @@
 #include "ppu.h"
 #include "raylib.h"
 #include "types.h"
+#include "cpu.h"
 
 extern cpu_t cpu;
 
 void *framebuffer[WINDOW_WIDTH * WINDOW_HEIGHT * 4] = {0};
 
 void try_step_cpu(void) {
-    TODO("yeah");
+    execute();
 }
 
 void ui(void) {
@@ -22,6 +23,7 @@ void ui(void) {
         ClearBackground(BLACK);
 
         cpu.remaining_clocks += 357368;
+        try_step_cpu();
 
         UpdateTexture(texture, framebuffer);
         DrawTexturePro(texture, (Rectangle){0, 0, WINDOW_WIDTH, WINDOW_HEIGHT},
