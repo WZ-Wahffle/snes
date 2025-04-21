@@ -3,7 +3,7 @@
 function build() {
     mkdir -p out
     # g++ -O3 -c -o src/ui.o src/ui.cpp -Isrc/include/ -Wall -Wextra -Werror -Wno-unused-function
-	gcc -g -o out/snes src/*.c -Isrc/include/ -Lsrc/lib/ -l:libraylib.a -l:libSDL2.a -lm -lrlImGui -limgui -Wall -Wextra -Werror -lstdc++ -DLOG_LEVEL=0
+	gcc -g -o out/snes src/*.c -Isrc/include/ -Lsrc/lib/ -l:libraylib.a -l:libSDL2.a -lm -lrlImGui -limgui -Wall -Wextra -Werror -lstdc++ -DLOG_LEVEL=0 -Wno-unused-function
 }
 
 function build_raylib() {
@@ -75,20 +75,35 @@ else
     if [ ! -f src/lib/libSDL2.a ]; then
         echo "building sdl2"
         build_sdl
+        if [ ! "$?" = "0" ]; then
+            exit 1
+        fi
     fi
     if [ ! -f src/include/raylib.h ]; then
         echo "building raylib"
         build_raylib
+        if [ ! "$?" = "0" ]; then
+            exit 1
+        fi
     fi
     if [ ! -f src/include/imgui.h ]; then
         echo "building imgui"
         build_imgui
+        if [ ! "$?" = "0" ]; then
+            exit 1
+        fi
     fi
     if [ ! -f src/include/rlImGui.h ]; then
         echo "building rlimgui"
         build_rlimgui
+        if [ ! "$?" = "0" ]; then
+            exit 1
+        fi
     fi
     echo "building"
     build
+    if [ ! "$?" = "0" ]; then
+        exit 1
+    fi
     echo "finished"
 fi

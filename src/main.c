@@ -1,7 +1,11 @@
+#include "cpu_mmu.h"
+#include "ppu.h"
 #include "types.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+extern cpu_t cpu;
 
 #define get16bits(d)                                                           \
     ((((uint32_t)(((const uint8_t *)(d))[1])) << 8) +                          \
@@ -81,8 +85,10 @@ int main(int argc, char **argv) {
     // problem: SNES roms are in one of three possible layouts and it's not
     // documented in the rom which one it is
     // solution: hardcode hashes of the roms
+
     uint8_t *file_to_hash = calloc(file_size, 1);
     fread(file_to_hash, 1, file_size, f);
+    fclose(f);
     uint32_t hash_value = super_fast_hash((char *)file_to_hash, file_size);
     log_message(LOG_LEVEL_INFO, "ROM hash value: 0x%x", hash_value);
     bool identified = false;
@@ -115,6 +121,24 @@ int main(int argc, char **argv) {
     }
 
     log_message(LOG_LEVEL_INFO, "Cartridge type: %d", header[0x16]);
+    log_message(LOG_LEVEL_INFO, "Cart size: %d kilobytes; %d banks",
+                file_size / 1024, file_size / 0x10000);
+    log_message(LOG_LEVEL_INFO, "ROM size: %d kilobytes",
+                (uint32_t)pow(2, header[0x17]));
+    log_message(LOG_LEVEL_INFO, "RAM size: %d kilobytes",
+                (uint32_t)pow(2, (double)(header[0x18])));
 
-    fclose(f);
+    cpu.memory.rom = calloc(pow(2, header[0x17]) * 1024, 1);
+    cpu.memory.rom_size = pow(2, header[0x17]) * 1024;
+    cpu.memory.ram = calloc(pow(2, header[0x18]) * 1024, 1);
+    cpu.memory.ram_size = pow(2, header[0x18]) * 1024;
+    ASSERT(file_size == cpu.memory.rom_size,
+           "File size: %d, ROM size: %d, expected equal length", file_size,
+           cpu.memory.rom_size);
+    memcpy(cpu.memory.rom, file_to_hash, file_size);
+    cpu.memory.mode = mode;
+    ui();
+
+    free(cpu.memory.ram);
+    free(cpu.memory.rom);
 }

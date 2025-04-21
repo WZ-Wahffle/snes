@@ -3,6 +3,7 @@
 
 #include "raylib.h"
 #include <assert.h>
+#include <math.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -18,8 +19,9 @@ static void log_message(log_level_t level, char *message, ...);
 #define ASSERT(val, msg, ...)                                                  \
     do {                                                                       \
         if (!(val)) {                                                          \
-            log_message(LOG_LEVEL_ERROR, "%s:%d: Assertion failed:", __FILE__, __LINE__);          \
-            log_message(LOG_LEVEL_ERROR, msg, __VA_ARGS__);                                          \
+            log_message(LOG_LEVEL_ERROR, "%s:%d: Assertion failed:", __FILE__, \
+                        __LINE__);                                             \
+            log_message(LOG_LEVEL_ERROR, msg, __VA_ARGS__);                    \
             exit(1);                                                           \
         }                                                                      \
     } while (0)
@@ -34,6 +36,9 @@ static void log_message(log_level_t level, char *message, ...);
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define ARRAYSIZE(a) (sizeof(a) / sizeof((a)[0]))
 
+#define WINDOW_WIDTH 256
+#define WINDOW_HEIGHT 224
+
 typedef enum { LOROM, HIROM, EXHIROM } memory_map_mode_t;
 
 typedef struct {
@@ -41,6 +46,19 @@ typedef struct {
     const uint32_t hash;
     const memory_map_mode_t mode;
 } cart_hash_t;
+
+typedef struct {
+    uint8_t *rom;
+    uint32_t rom_size;
+    uint8_t *ram;
+    uint32_t ram_size;
+    memory_map_mode_t mode;
+} cpu_mmu_t;
+
+typedef struct {
+    cpu_mmu_t memory;
+    double remaining_clocks;
+} cpu_t;
 
 static void log_message(log_level_t level, char *message, ...) {
 #ifdef LOG_LEVEL
