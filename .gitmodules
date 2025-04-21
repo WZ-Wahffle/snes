@@ -1,0 +1,13 @@
+[submodule "raylib"]
+	path = raylib
+	url = https://github.com/raysan5/raylib
+[submodule "rlImGui"]
+	path = rlImGui
+	url = https://github.com/raylib-extras/rlImGui
+[submodule "imgui"]
+	path = imgui
+	url = https://github.com/ocornut/imgui
+[submodule "SDL"]
+	path = SDL
+	url = https://github.com/libsdl-org/SDL.git
+	branch = SDL2
