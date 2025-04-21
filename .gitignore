@@ -7,5 +7,5 @@ imgui
 SDL
 tmp
 imgui.ini
-input/
+in/
 *.o
