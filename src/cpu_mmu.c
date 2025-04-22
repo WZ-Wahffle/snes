@@ -2,6 +2,7 @@
 #include "types.h"
 
 extern cpu_t cpu;
+extern ppu_t ppu;
 
 // https://snes.nesdev.org/wiki/Memory_map#LoROM
 static uint32_t lo_rom_resolve(uint32_t addr) {
@@ -76,12 +77,27 @@ uint8_t mmu_read(uint16_t addr, uint8_t bank) {
 }
 
 void mmu_write(uint16_t addr, uint8_t bank, uint8_t value) {
-    (void)value;
     if ((bank < 0x40 || (bank >= 0x80 && bank < 0xc0)) && addr < 0x8000) {
         if (addr < 0x2000) {
-            TODO("low ram write");
+            cpu.memory.ram[addr] = value;
         } else if (addr < 0x6000) {
             switch (addr) {
+            case 0x2100:
+                ppu.brightness = value & 0xf;
+                ppu.force_blanking = value & 0x80;
+                break;
+            case 0x2140:
+                cpu.memory.apu_bus[0] = value;
+                break;
+            case 0x2141:
+                cpu.memory.apu_bus[1] = value;
+                break;
+            case 0x2142:
+                cpu.memory.apu_bus[2] = value;
+                break;
+            case 0x2143:
+                cpu.memory.apu_bus[3] = value;
+                break;
             case 0x4200:
                 cpu.vblank_nmi_enable = value & 0x80;
                 cpu.timer_irq = (value >> 4) & 0b11;
@@ -100,5 +116,10 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value) {
         } else {
             TODO("expansion write");
         }
+    } else if (bank == 0x7e || bank == 0x7f) {
+        cpu.memory.ram[(bank - 0x7e) * 0x10000 + addr] = value;
+    } else {
+        ASSERT(0, "Tried to write 0x%02x to bank 0x%02x, address 0x%04x", value,
+               bank, addr);
     }
 }

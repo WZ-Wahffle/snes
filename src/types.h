@@ -46,6 +46,8 @@ static void log_message(log_level_t level, char *message, ...);
 
 #define WINDOW_WIDTH 256
 #define WINDOW_HEIGHT 224
+#define CLOCK_FREQ 21477268
+#define CYCLES_PER_DOT 4
 
 typedef enum { LOROM, HIROM, EXHIROM } memory_map_mode_t;
 
@@ -81,11 +83,21 @@ typedef enum {
     STATUS_ZERO,
     STATUS_IRQOFF,
     STATUS_BCD,
-    STATUS_XWIDE,
-    STATUS_MEMWIDE,
+    STATUS_XNARROW,
+    STATUS_MEMNARROW,
     STATUS_OVERFLOW,
     STATUS_NEGATIVE
 } status_bit_t;
+
+typedef enum {
+    STATE_STOPPED,
+    STATE_STEPPED,
+    STATE_RUNNING
+} emu_state_t;
+
+typedef enum {
+    R_C, R_X, R_Y, R_S, R_D
+} r_t;
 
 typedef struct {
     const char *name;
@@ -96,8 +108,9 @@ typedef struct {
 typedef struct {
     uint8_t *rom;
     uint32_t rom_size;
-    uint8_t *ram;
-    uint32_t ram_size;
+    uint8_t* sram;
+    uint32_t sram_size;
+    uint8_t ram[0x20000];
     memory_map_mode_t mode;
 
     struct dma_t {
@@ -114,6 +127,8 @@ typedef struct {
         bool hdma_repeat;
         uint8_t scanlines_left;
     } dmas[8];
+
+    uint8_t apu_bus[4];
 } cpu_mmu_t;
 
 typedef struct {
@@ -121,10 +136,39 @@ typedef struct {
     double remaining_clocks;
     bool vblank_nmi_enable;
     uint8_t timer_irq;
+    bool emulation_mode;
+
+    emu_state_t state;
 
     uint16_t pc, c, x, y, d, s;
     uint8_t dbr, pbr, p;
 } cpu_t;
+
+typedef struct {
+    bool force_blanking;
+    uint8_t brightness;
+    double remaining_clocks;
+    uint16_t beam_x, beam_y;
+} ppu_t;
+
+#ifdef __cplusplus
+#define EXTERNC extern "C"
+#else
+#define EXTERNC
+#endif
+EXTERNC void set_status_bit(status_bit_t bit, bool value);
+EXTERNC bool get_status_bit(status_bit_t bit);
+EXTERNC uint32_t resolve_addr(addressing_mode_t mode);
+EXTERNC uint16_t resolve_read8(addressing_mode_t mode);
+EXTERNC uint16_t resolve_read16(addressing_mode_t mode, bool respect_x, bool respect_m);
+
+EXTERNC uint8_t read_8(uint16_t addr, uint8_t bank);
+EXTERNC uint16_t read_16(uint16_t addr, uint8_t bank);
+EXTERNC uint32_t read_24(uint16_t addr, uint8_t bank);
+EXTERNC uint16_t read_r(r_t reg);
+EXTERNC void write_8(uint16_t addr, uint8_t bank, uint8_t val);
+EXTERNC void write_16(uint16_t addr, uint8_t bank, uint16_t val);
+EXTERNC void write_r(r_t reg, uint16_t val);
 
 static void log_message(log_level_t level, char *message, ...) {
 #ifdef LOG_LEVEL

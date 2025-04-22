@@ -127,16 +127,18 @@ int main(int argc, char **argv) {
 
     cpu.memory.rom = calloc(pow(2, header[0x17]) * 1024, 1);
     cpu.memory.rom_size = pow(2, header[0x17]) * 1024;
-    cpu.memory.ram = calloc(pow(2, header[0x18]) * 1024, 1);
-    cpu.memory.ram_size = pow(2, header[0x18]) * 1024;
+    cpu.memory.sram = calloc(pow(2, header[0x18]) * 1024, 1);
+    cpu.memory.sram_size = pow(2, header[0x18]) * 1024;
     ASSERT(file_size == cpu.memory.rom_size,
            "File size: %d, ROM size: %d, expected equal length", file_size,
            cpu.memory.rom_size);
     memcpy(cpu.memory.rom, file_to_hash, file_size);
     cpu.memory.mode = mode;
+    cpu.emulation_mode = true;
+    cpu.p = 0b110000;
     reset();
     ui();
 
-    free(cpu.memory.ram);
+    free(cpu.memory.sram);
     free(cpu.memory.rom);
 }

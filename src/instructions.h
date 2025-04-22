@@ -3,10 +3,6 @@
 
 #include "types.h"
 
-void set_status_bit(status_bit_t bit, bool value);
-bool get_status_bit(status_bit_t bit);
-uint32_t resolve_addr(addressing_mode_t mode);
-
 #define OP(name) void name(addressing_mode_t mode)
 #define LEGALADDRMODES(modes)                                                  \
     ASSERT((mode & (modes)) != 0,                                              \
@@ -15,4 +11,16 @@ uint32_t resolve_addr(addressing_mode_t mode);
 
 OP(sei);
 OP(stz);
+OP(lda);
+OP(sta);
+OP(clc);
+OP(xce);
+OP(rep);
+OP(tcd);
+OP(tcs);
+OP(ldx);
+OP(ldy);
+OP(tya);
+OP(sec);
+OP(sbc);
 #endif
