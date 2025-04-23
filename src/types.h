@@ -169,6 +169,12 @@ EXTERNC uint16_t read_r(r_t reg);
 EXTERNC void write_8(uint16_t addr, uint8_t bank, uint8_t val);
 EXTERNC void write_16(uint16_t addr, uint8_t bank, uint16_t val);
 EXTERNC void write_r(r_t reg, uint16_t val);
+EXTERNC void push_8(uint8_t val);
+EXTERNC void push_16(uint16_t val);
+EXTERNC void push_24(uint32_t val);
+EXTERNC uint8_t pop_8(void);
+EXTERNC uint16_t pop_16(void);
+EXTERNC uint32_t pop_24(void);
 
 static void log_message(log_level_t level, char *message, ...) {
 #ifdef LOG_LEVEL

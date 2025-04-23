@@ -35,6 +35,7 @@ void cpu_window(void) {
                     : "Y: 0x%04x",
                 cpu.y);
     ImGui::Text("D: 0x%04x", cpu.d);
+    ImGui::Text("SP: 0x%04x", cpu.s);
     ImGui::Text("P: 0x%02x", cpu.p);
 
     ImGui::End();

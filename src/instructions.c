@@ -86,6 +86,12 @@ OP(rep) {
     cpu.p &= ~val;
 }
 
+OP(sep) {
+    LEGALADDRMODES(AM_IMM);
+    uint8_t val = resolve_read8(mode);
+    cpu.p |= val;
+}
+
 OP(tcd) {
     LEGALADDRMODES(AM_IMP);
     cpu.d = cpu.c;
@@ -125,6 +131,15 @@ OP(tya) {
     set_status_bit(STATUS_NEGATIVE, get_status_bit(STATUS_MEMNARROW)
                                         ? (cpu.c & 0x80)
                                         : (cpu.c & 0x8000));
+}
+
+OP(tay) {
+    LEGALADDRMODES(AM_IMP);
+    write_r(R_Y, cpu.c);
+    set_status_bit(STATUS_ZERO, cpu.y == 0);
+    set_status_bit(STATUS_NEGATIVE, get_status_bit(STATUS_XNARROW)
+                                        ? (cpu.y & 0x80)
+                                        : (cpu.y & 0x8000));
 }
 
 OP(sec) {
@@ -200,5 +215,25 @@ OP(sbc) {
         set_status_bit(STATUS_ZERO, (result & 0xffff) == 0);
         set_status_bit(STATUS_NEGATIVE, result & 0x8000);
         write_r(R_C, result);
+    }
+}
+
+OP(dex) {
+    LEGALADDRMODES(AM_IMP);
+    uint16_t val = read_r(R_X);
+    val--;
+    write_r(R_X, val);
+    set_status_bit(STATUS_ZERO, cpu.x == 0);
+    set_status_bit(STATUS_NEGATIVE, get_status_bit(STATUS_XNARROW)
+                                        ? (cpu.x & 0x80)
+                                        : (cpu.x & 0x8000));
+}
+
+OP(bpl) {
+    LEGALADDRMODES(AM_PC_REL);
+    if (!get_status_bit(STATUS_NEGATIVE)) {
+        cpu.pc = resolve_addr(mode);
+    } else {
+        cpu.pc++;
     }
 }

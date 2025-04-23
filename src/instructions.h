@@ -16,11 +16,15 @@ OP(sta);
 OP(clc);
 OP(xce);
 OP(rep);
+OP(sep);
 OP(tcd);
 OP(tcs);
 OP(ldx);
 OP(ldy);
 OP(tya);
+OP(tay);
 OP(sec);
 OP(sbc);
+OP(dex);
+OP(bpl);
 #endif

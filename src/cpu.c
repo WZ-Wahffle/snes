@@ -104,6 +104,25 @@ void set_status_bit(status_bit_t bit, bool value) {
     }
 }
 
+void push_8(uint8_t val) { write_8(cpu.s--, 0, val); }
+void push_16(uint16_t val) {
+    push_8(U16_HIBYTE(val));
+    push_8(U16_LOBYTE(val));
+}
+void push_24(uint32_t val) {
+    push_8(U24_HIBYTE(val));
+    push_16(U24_LOSHORT(val));
+}
+uint8_t pop_8(void) { return read_8(++cpu.s, 0); }
+uint16_t pop_16(void) {
+    uint8_t lsb = pop_8();
+    return TO_U16(lsb, pop_8());
+}
+uint32_t pop_24(void) {
+    uint16_t lss = pop_16();
+    return TO_U24(lss, pop_8());
+}
+
 bool get_status_bit(status_bit_t bit) {
     if (cpu.emulation_mode) {
         cpu.p |= 0b110000;
@@ -201,7 +220,6 @@ uint16_t resolve_read16(addressing_mode_t mode, bool respect_x,
     case AM_IND_DIR:
     case AM_DIR:
     case AM_PC_REL_L:
-    case AM_PC_REL:
     case AM_STK_REL:
     case AM_STK_REL_INDY: {
         uint32_t addr = resolve_addr(mode);
@@ -236,6 +254,9 @@ void execute(void) {
     uint8_t opcode = next_8();
     log_message(LOG_LEVEL_VERBOSE, "fetched opcode 0x%02x", opcode);
     switch (opcode) {
+    case 0x10:
+        bpl(AM_PC_REL);
+        break;
     case 0x18:
         clc(AM_IMP);
         break;
@@ -272,13 +293,22 @@ void execute(void) {
     case 0xa2:
         ldx(AM_IMM);
         break;
+    case 0xa8:
+        tay(AM_IMP);
+        break;
     case 0xa9:
         lda(AM_IMM);
         break;
     case 0xc2:
         rep(AM_IMM);
         break;
-        case 0xe9:
+    case 0xca:
+        dex(AM_IMP);
+        break;
+    case 0xe2:
+        sep(AM_IMM);
+        break;
+    case 0xe9:
         sbc(AM_IMM);
         break;
     case 0xfb:
