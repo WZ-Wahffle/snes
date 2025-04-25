@@ -97,7 +97,9 @@ void spc_window(void) {
 }
 
 extern "C" {
-void cpp_init(void) { rlImGuiSetup(true); }
+void cpp_init(void) {
+    rlImGuiSetup(true);
+}
 
 void cpp_imgui_render(void) {
     rlImGuiBegin();
