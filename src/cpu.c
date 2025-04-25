@@ -1,9 +1,7 @@
 #include "cpu.h"
-#include "cpu_mmu.h"
-#include "instructions.h"
-#include "types.h"
 
 extern cpu_t cpu;
+extern spc_t spc;
 
 uint16_t read_r(r_t reg) {
     switch (reg) {
@@ -93,7 +91,7 @@ uint32_t next_24(void) {
 }
 
 void set_status_bit(status_bit_t bit, bool value) {
-    log_message(LOG_LEVEL_VERBOSE, "Set status bit %d", bit);
+    log_message(LOG_LEVEL_VERBOSE, "CPU set status bit %d", bit);
     if (value) {
         cpu.p |= 1 << bit;
     } else {
@@ -248,12 +246,35 @@ uint16_t resolve_read8(addressing_mode_t mode) {
     }
 }
 
-void reset(void) { cpu.pc = read_16(0xfffc, 0); }
+void cpu_reset(void) {
+    cpu.pc = read_16(0xfffc, 0);
+    cpu.emulation_mode = true;
+    cpu.p = 0b110000;
+}
 
-void execute(void) {
+static uint8_t cpu_cycle_counts[] = {
+    7, 6, 7, 4, 5, 3, 5, 6, 3, 2, 2, 4, 6, 4, 6, 5, 2, 5, 5, 7, 5, 4, 6, 6,
+    2, 4, 2, 2, 6, 4, 7, 5, 6, 6, 8, 4, 3, 3, 5, 6, 4, 2, 2, 5, 4, 4, 6, 5,
+    2, 5, 5, 7, 4, 4, 6, 6, 2, 4, 2, 2, 4, 4, 7, 5, 7, 6, 2, 4, 7, 3, 5, 6,
+    3, 2, 2, 3, 3, 4, 6, 5, 2, 5, 5, 7, 7, 4, 6, 6, 2, 4, 3, 2, 4, 4, 7, 5,
+    6, 6, 6, 4, 3, 3, 5, 6, 4, 2, 2, 6, 5, 4, 6, 5, 2, 5, 5, 7, 4, 4, 6, 6,
+    2, 4, 4, 2, 6, 4, 7, 5, 2, 6, 4, 4, 3, 3, 3, 2, 2, 2, 2, 3, 4, 4, 4, 5,
+    2, 6, 5, 7, 4, 4, 4, 6, 2, 5, 2, 2, 4, 5, 5, 5, 2, 6, 2, 4, 3, 3, 3, 6,
+    2, 2, 2, 4, 4, 4, 4, 5, 2, 5, 5, 7, 4, 4, 4, 6, 2, 4, 2, 2, 4, 4, 4, 5,
+    2, 6, 3, 4, 3, 3, 5, 6, 2, 2, 2, 3, 4, 4, 6, 5, 2, 5, 5, 7, 6, 4, 6, 6,
+    2, 4, 3, 3, 6, 4, 7, 5, 2, 6, 3, 4, 3, 3, 5, 6, 2, 2, 2, 3, 4, 4, 6, 5,
+    2, 5, 5, 7, 5, 4, 6, 6, 2, 4, 4, 2, 8, 4, 7, 5,
+};
+
+void cpu_execute(void) {
     uint8_t opcode = next_8();
-    log_message(LOG_LEVEL_VERBOSE, "fetched opcode 0x%02x", opcode);
+    log_message(LOG_LEVEL_VERBOSE, "CPU fetched opcode 0x%02x", opcode);
+    // TODO: disambiguate cpu cycles taking 6, 8 or 12 clock cycles
+    cpu.remaining_clocks -= 6 * cpu_cycle_counts[opcode];
     switch (opcode) {
+    case 0x08:
+        php(AM_STK);
+        break;
     case 0x10:
         bpl(AM_PC_REL);
         break;
@@ -262,6 +283,9 @@ void execute(void) {
         break;
     case 0x1b:
         tcs(AM_IMP);
+        break;
+    case 0x20:
+        jsr(AM_ABS);
         break;
     case 0x38:
         sec(AM_IMP);
@@ -304,6 +328,12 @@ void execute(void) {
         break;
     case 0xca:
         dex(AM_IMP);
+        break;
+    case 0xcd:
+        cmp(AM_ABS);
+        break;
+    case 0xd0:
+        bne(AM_PC_REL);
         break;
     case 0xe2:
         sep(AM_IMM);

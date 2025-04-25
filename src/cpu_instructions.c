@@ -1,7 +1,7 @@
-#include "instructions.h"
-#include "types.h"
+#include "cpu_instructions.h"
 
 extern cpu_t cpu;
+extern spc_t spc;
 
 static const char *addressing_mode_strings[] = {
     "Absolute",
@@ -218,6 +218,22 @@ OP(sbc) {
     }
 }
 
+OP(cmp) {
+    LEGALADDRMODES(AM_ABS | AM_ABSX | AM_ABSY | AM_ABS_L | AM_ABSX_L | AM_DIR |
+                   AM_STK_REL | AM_ZBKX_DIR | AM_IND_DIR | AM_IND_DIR_L |
+                   AM_STK_REL_INDY | AM_INDX_DIR | AM_INDY_DIR | AM_INDY_DIR_L |
+                   AM_IMM);
+    uint16_t val = resolve_read16(mode, false, true);
+    int32_t result = read_r(R_C) - val;
+    set_status_bit(STATUS_CARRY, result >= 0);
+    set_status_bit(STATUS_ZERO, get_status_bit(STATUS_MEMNARROW)
+                                    ? (result & 0xff) == 0
+                                    : (result & 0xffff) == 0);
+    set_status_bit(STATUS_NEGATIVE, get_status_bit(STATUS_MEMNARROW)
+                                        ? (result & 0x80)
+                                        : (result & 0x8000));
+}
+
 OP(dex) {
     LEGALADDRMODES(AM_IMP);
     uint16_t val = read_r(R_X);
@@ -236,4 +252,25 @@ OP(bpl) {
     } else {
         cpu.pc++;
     }
+}
+
+OP(bne) {
+    LEGALADDRMODES(AM_PC_REL);
+    if(!get_status_bit(STATUS_ZERO)) {
+        cpu.pc = resolve_addr(mode);
+    } else {
+        cpu.pc++;
+    }
+}
+
+OP(jsr) {
+    LEGALADDRMODES(AM_ABS | AM_INDX);
+    uint16_t addr = resolve_addr(mode);
+    push_16(cpu.pc);
+    cpu.pc = addr;
+}
+
+OP(php) {
+    LEGALADDRMODES(AM_STK);
+    push_8(cpu.p);
 }

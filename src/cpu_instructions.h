@@ -25,6 +25,10 @@ OP(tya);
 OP(tay);
 OP(sec);
 OP(sbc);
+OP(cmp);
 OP(dex);
 OP(bpl);
+OP(bne);
+OP(jsr);
+OP(php);
 #endif

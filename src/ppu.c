@@ -1,8 +1,5 @@
 #include "ppu.h"
-#include "cpu.h"
 #include "raylib.h"
-#include "types.h"
-#include "ui.h"
 
 extern cpu_t cpu;
 extern ppu_t ppu;
@@ -15,7 +12,11 @@ void set_pixel(uint16_t x, uint16_t y, uint32_t color) {
 
 void try_step_cpu(void) {
     if (cpu.remaining_clocks > 0) {
-        execute();
+        cpu_execute();
+        if (cpu.breakpoint_valid &&
+            TO_U24(cpu.pc, cpu.pbr) == cpu.breakpoint) {
+            cpu.state = STATE_STOPPED;
+        }
     }
 }
 
@@ -81,6 +82,12 @@ void ui(void) {
             }
         }
 
+
+        UpdateTexture(texture, framebuffer);
+        DrawTexturePro(texture, (Rectangle){0, 0, WINDOW_WIDTH, WINDOW_HEIGHT},
+                       (Rectangle){0, 0, GetScreenWidth(), GetScreenHeight()},
+                       (Vector2){0, 0}, 0.0f, WHITE);
+
         if (IsKeyPressed(KEY_TAB)) {
             view_debug_ui = !view_debug_ui;
         }
@@ -88,11 +95,6 @@ void ui(void) {
         if (view_debug_ui) {
             cpp_imgui_render();
         }
-
-        UpdateTexture(texture, framebuffer);
-        DrawTexturePro(texture, (Rectangle){0, 0, WINDOW_WIDTH, WINDOW_HEIGHT},
-                       (Rectangle){0, 0, GetScreenWidth(), GetScreenHeight()},
-                       (Vector2){0, 0}, 0.0f, WHITE);
 
         EndDrawing();
     }

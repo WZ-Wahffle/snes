@@ -8,6 +8,7 @@ extern cpu_t cpu;
 extern ppu_t ppu;
 
 bool show_cpu_window = false;
+char bp_inter[7] = {0};
 void cpu_window(void) {
     ImGui::Begin("cpu", NULL);
     ImGui::SetWindowFontScale(2);
@@ -37,6 +38,27 @@ void cpu_window(void) {
     ImGui::Text("D: 0x%04x", cpu.d);
     ImGui::Text("SP: 0x%04x", cpu.s);
     ImGui::Text("P: 0x%02x", cpu.p);
+
+    ImGui::NewLine();
+
+    ImGui::Text("Breakpoint: 0x");
+        ImGui::SameLine();
+        ImGui::PushItemWidth(4 * ImGui::GetFontSize());
+        ImGui::InputText("##bpin", bp_inter, 7);
+        ImGui::PopItemWidth();
+        cpu.breakpoint_valid = true;
+        for (char &c : bp_inter) {
+            if ((c < '0' || c > '9') && (c < 'a' || c > 'f') &&
+                (c < 'A' || c > 'F'))
+                cpu.breakpoint_valid = false;
+            break;
+        }
+        if (!cpu.breakpoint_valid) {
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4{0xff, 0, 0, 0xff}, "Invalid!");
+        } else {
+            cpu.breakpoint = strtoul(bp_inter, NULL, 16);
+        }
 
     ImGui::End();
 }

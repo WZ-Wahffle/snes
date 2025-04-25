@@ -3,6 +3,7 @@
 #include "types.h"
 
 extern cpu_t cpu;
+extern spc_t spc;
 
 #define get16bits(d)                                                           \
     ((((uint32_t)(((const uint8_t *)(d))[1])) << 8) +                          \
@@ -134,9 +135,7 @@ int main(int argc, char **argv) {
            cpu.memory.rom_size);
     memcpy(cpu.memory.rom, file_to_hash, file_size);
     cpu.memory.mode = mode;
-    cpu.emulation_mode = true;
-    cpu.p = 0b110000;
-    reset();
+    cpu_reset();
     ui();
 
     free(cpu.memory.sram);

@@ -27,14 +27,17 @@ static void log_message(log_level_t level, char *message, ...);
             log_message(LOG_LEVEL_ERROR, "%s:%d: Assertion failed:", __FILE__, \
                         __LINE__);                                             \
             log_message(LOG_LEVEL_ERROR, msg, __VA_ARGS__);                    \
+            log_message(LOG_LEVEL_ERROR, "CPU PC: 0x%04x, bank: 0x%02x",       \
+                        cpu.pc, cpu.pbr);                                      \
+            log_message(LOG_LEVEL_ERROR, "SPC PC: 0x%04x", spc.pc);            \
             exit(1);                                                           \
         }                                                                      \
     } while (0)
 #define UNREACHABLE_SWITCH(val)                                                \
     ASSERT(0, "Illegal value in switch: %d, 0x%04x\n", val, val)
 #define TODO(val) ASSERT(0, "%sTODO: " val "\n", "")
-#define TO_U16(lsb, msb) ((lsb & 0xff) | ((msb & 0xff) << 8))
-#define TO_U24(lss, msb) ((lss) | ((msb) << 16))
+#define TO_U16(lsb, msb) ((uint16_t)(lsb & 0xff) | ((msb & 0xff) << 8))
+#define TO_U24(lss, msb) ((uint32_t)(lss) | ((msb) << 16))
 #define U16_LOBYTE(val) ((val) & 0xff)
 #define U16_HIBYTE(val) (((val) >> 8) & 0xff)
 #define U24_LOSHORT(val) ((val) & 0xffff)
@@ -89,15 +92,9 @@ typedef enum {
     STATUS_NEGATIVE
 } status_bit_t;
 
-typedef enum {
-    STATE_STOPPED,
-    STATE_STEPPED,
-    STATE_RUNNING
-} emu_state_t;
+typedef enum { STATE_STOPPED, STATE_STEPPED, STATE_RUNNING } emu_state_t;
 
-typedef enum {
-    R_C, R_X, R_Y, R_S, R_D
-} r_t;
+typedef enum { R_C, R_X, R_Y, R_S, R_D } r_t;
 
 typedef struct {
     const char *name;
@@ -108,7 +105,7 @@ typedef struct {
 typedef struct {
     uint8_t *rom;
     uint32_t rom_size;
-    uint8_t* sram;
+    uint8_t *sram;
     uint32_t sram_size;
     uint8_t ram[0x20000];
     memory_map_mode_t mode;
@@ -128,7 +125,7 @@ typedef struct {
         uint8_t scanlines_left;
     } dmas[8];
 
-    uint8_t apu_bus[4];
+    uint8_t apu_io[4];
 } cpu_mmu_t;
 
 typedef struct {
@@ -139,10 +136,22 @@ typedef struct {
     bool emulation_mode;
 
     emu_state_t state;
+    bool breakpoint_valid;
+    uint32_t breakpoint;
 
     uint16_t pc, c, x, y, d, s;
     uint8_t dbr, pbr, p;
 } cpu_t;
+
+typedef struct {
+    uint8_t apu_io[4];
+} spc_mmu_t;
+
+typedef struct {
+    spc_mmu_t memory;
+    uint8_t a, x, y, s, p;
+    uint16_t pc;
+} spc_t;
 
 typedef struct {
     bool force_blanking;
@@ -160,7 +169,8 @@ EXTERNC void set_status_bit(status_bit_t bit, bool value);
 EXTERNC bool get_status_bit(status_bit_t bit);
 EXTERNC uint32_t resolve_addr(addressing_mode_t mode);
 EXTERNC uint16_t resolve_read8(addressing_mode_t mode);
-EXTERNC uint16_t resolve_read16(addressing_mode_t mode, bool respect_x, bool respect_m);
+EXTERNC uint16_t resolve_read16(addressing_mode_t mode, bool respect_x,
+                                bool respect_m);
 
 EXTERNC uint8_t read_8(uint16_t addr, uint8_t bank);
 EXTERNC uint16_t read_16(uint16_t addr, uint8_t bank);

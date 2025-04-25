@@ -1,8 +1,8 @@
 #include "cpu_mmu.h"
-#include "types.h"
 
 extern cpu_t cpu;
 extern ppu_t ppu;
+extern spc_t spc;
 
 // https://snes.nesdev.org/wiki/Memory_map#LoROM
 static uint32_t lo_rom_resolve(uint32_t addr) {
@@ -73,7 +73,27 @@ uint8_t mmu_read(uint16_t addr, uint8_t bank) {
         }
         break;
     }
-    TODO("Reading from rest of memory");
+
+    if ((bank < 0x40 || (bank >= 0x80 && bank < 0xc0)) && addr < 0x8000) {
+        if (addr < 0x2000) {
+            return cpu.memory.ram[addr];
+        } else if (addr < 0x6000) {
+            switch (addr) {
+            case 0x2140:
+            case 0x2141:
+            case 0x2142:
+            case 0x2143:
+                return spc.memory.apu_io[addr - 0x2140];
+                break;
+            default:
+                UNREACHABLE_SWITCH(addr);
+            }
+        }
+    } else if (bank == 0x7e || bank == 0x7f) {
+        return cpu.memory.ram[(bank - 0x7e) * 0x10000 + addr];
+    }
+
+    ASSERT(0, "Tried to read from bank 0x%02x, address 0x%04x", bank, addr);
 }
 
 void mmu_write(uint16_t addr, uint8_t bank, uint8_t value) {
@@ -87,16 +107,10 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value) {
                 ppu.force_blanking = value & 0x80;
                 break;
             case 0x2140:
-                cpu.memory.apu_bus[0] = value;
-                break;
             case 0x2141:
-                cpu.memory.apu_bus[1] = value;
-                break;
             case 0x2142:
-                cpu.memory.apu_bus[2] = value;
-                break;
             case 0x2143:
-                cpu.memory.apu_bus[3] = value;
+                cpu.memory.apu_io[addr - 0x2140] = value;
                 break;
             case 0x4200:
                 cpu.vblank_nmi_enable = value & 0x80;
