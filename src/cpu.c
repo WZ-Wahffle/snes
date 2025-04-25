@@ -1,4 +1,5 @@
 #include "cpu.h"
+#include "types.h"
 
 extern cpu_t cpu;
 extern spc_t spc;
@@ -291,14 +292,32 @@ void cpu_execute(void) {
     case 0x20:
         jsr(AM_ABS);
         break;
+    case 0x2a:
+        rol(AM_ACC);
+        break;
     case 0x38:
         sec(AM_IMP);
+        break;
+    case 0x48:
+        pha(AM_STK);
         break;
     case 0x5b:
         tcd(AM_IMP);
         break;
+        case 0x68:
+        pla(AM_STK);
+        break;
+    case 0x69:
+        adc(AM_IMM);
+        break;
     case 0x78:
         sei(AM_IMP);
+        break;
+    case 0x80:
+        bra(AM_PC_REL);
+        break;
+    case 0x88:
+        dey(AM_IMP);
         break;
     case 0x8d:
         sta(AM_ABS);
@@ -327,8 +346,17 @@ void cpu_execute(void) {
     case 0xa9:
         lda(AM_IMM);
         break;
+    case 0xaa:
+        tax(AM_IMP);
+        break;
+    case 0xb7:
+        lda(AM_INDY_DIR_L);
+        break;
     case 0xc2:
         rep(AM_IMM);
+        break;
+    case 0xc8:
+        iny(AM_IMP);
         break;
     case 0xca:
         dex(AM_IMP);
@@ -339,8 +367,14 @@ void cpu_execute(void) {
     case 0xd0:
         bne(AM_PC_REL);
         break;
+    case 0xe0:
+        cpx(AM_IMM);
+        break;
     case 0xe2:
         sep(AM_IMM);
+        break;
+    case 0xe8:
+        inx(AM_IMP);
         break;
     case 0xe9:
         sbc(AM_IMM);
