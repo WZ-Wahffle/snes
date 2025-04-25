@@ -8,11 +8,10 @@ extern cpu_t cpu;
 extern ppu_t ppu;
 extern spc_t spc;
 
-bool show_cpu_window = false;
 char bp_inter[7] = {0};
 void cpu_window(void) {
     ImGui::Begin("cpu", NULL);
-    ImGui::SetWindowFontScale(2);
+    // ImGui::SetWindowFontScale(2);
     ImGui::Text("PC: 0x%04x Opcode: 0x%02x", cpu.pc, read_8(cpu.pc, cpu.pbr));
     if (ImGui::Button("Start"))
         cpu.state = STATE_RUNNING;
@@ -64,11 +63,10 @@ void cpu_window(void) {
     ImGui::End();
 }
 
-bool show_spc_window = false;
 char spc_bp_inter[5] = {0};
 void spc_window(void) {
     ImGui::Begin("spc", NULL);
-    ImGui::SetWindowFontScale(2);
+    // ImGui::SetWindowFontScale(2);
     ImGui::Text("PC: 0x%04x Opcode: 0x%02x", spc.pc, spc_read_8(spc.pc));
     ImGui::Text("A: 0x%02x", spc.a);
     ImGui::Text("X: 0x%02x", spc.x);
@@ -99,25 +97,14 @@ void spc_window(void) {
 extern "C" {
 void cpp_init(void) {
     rlImGuiSetup(true);
+    ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    ImGui::GetIO().FontGlobalScale *= 2;
 }
 
 void cpp_imgui_render(void) {
     rlImGuiBegin();
-    ImGui::Begin("master", NULL, ImGuiWindowFlags_NoCollapse);
-    ImGui::SetWindowFontScale(2);
-
-    if (ImGui::Button("CPU"))
-        show_cpu_window = !show_cpu_window;
-
-    if (ImGui::Button("SPC"))
-        show_spc_window = !show_spc_window;
-    ImGui::End();
-
-    if (show_cpu_window)
-        cpu_window();
-
-    if (show_spc_window)
-        spc_window();
+    cpu_window();
+    spc_window();
     rlImGuiEnd();
 }
 

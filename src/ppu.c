@@ -112,6 +112,7 @@ void ui(void) {
         if (view_debug_ui) {
             cpp_imgui_render();
         }
+        // view_debug_ui = true;
 
         EndDrawing();
     }
