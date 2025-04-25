@@ -11,7 +11,6 @@ extern spc_t spc;
 char bp_inter[7] = {0};
 void cpu_window(void) {
     ImGui::Begin("cpu", NULL);
-    // ImGui::SetWindowFontScale(2);
     ImGui::Text("PC: 0x%04x Opcode: 0x%02x", cpu.pc, read_8(cpu.pc, cpu.pbr));
     if (ImGui::Button("Start"))
         cpu.state = STATE_RUNNING;
@@ -66,7 +65,6 @@ void cpu_window(void) {
 char spc_bp_inter[5] = {0};
 void spc_window(void) {
     ImGui::Begin("spc", NULL);
-    // ImGui::SetWindowFontScale(2);
     ImGui::Text("PC: 0x%04x Opcode: 0x%02x", spc.pc, spc_read_8(spc.pc));
     ImGui::Text("A: 0x%02x", spc.a);
     ImGui::Text("X: 0x%02x", spc.x);
@@ -94,6 +92,28 @@ void spc_window(void) {
     ImGui::End();
 }
 
+int32_t spc_page = 0;
+void spc_ram_window(void) {
+    ImGui::Begin("spc ram");
+    ImGui::InputInt("Page", &spc_page);
+    if(spc_page < 0) spc_page = 0;
+    if(spc_page > 0xff) spc_page = 0xff;
+    if(ImGui::BeginTable("##spcram", 16, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
+        for(uint16_t i = 0; i < 16; i++) {
+            for(uint8_t j = 0; j < 16; j++) {
+                ImGui::TableNextColumn();
+                ImGui::Text("%02x", spc.memory.ram[spc_page * 0x100 + i * 16 + j]);
+                if(ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("0x%04x", spc_page * 0x100 + i * 16 + j);
+                }
+            }
+            if(i != 15) ImGui::TableNextRow();
+        }
+        ImGui::EndTable();
+    }
+    ImGui::End();
+}
+
 extern "C" {
 void cpp_init(void) {
     rlImGuiSetup(true);
@@ -103,8 +123,9 @@ void cpp_init(void) {
 
 void cpp_imgui_render(void) {
     rlImGuiBegin();
-    cpu_window();
     spc_window();
+    spc_ram_window();
+    cpu_window();
     rlImGuiEnd();
 }
 

@@ -44,22 +44,31 @@ uint32_t read_24(uint16_t addr, uint8_t bank) {
 void write_r(r_t reg, uint16_t val) {
     switch (reg) {
     case R_C:
-        if (cpu.emulation_mode) {
+        if (cpu.emulation_mode || get_status_bit(STATUS_MEMNARROW)) {
             val = U16_LOBYTE(val);
+            cpu.c &= 0xff00;
+        } else {
+            cpu.c &= 0;
         }
-        cpu.c = val;
+        cpu.c |= val;
         break;
     case R_X:
-        if (cpu.emulation_mode) {
+        if (cpu.emulation_mode || get_status_bit(STATUS_XNARROW)) {
             val = U16_LOBYTE(val);
+            cpu.x &= 0xff00;
+        } else {
+            cpu.x &= 0;
         }
-        cpu.x = val;
+        cpu.x |= val;
         break;
     case R_Y:
-        if (cpu.emulation_mode) {
+        if (cpu.emulation_mode || get_status_bit(STATUS_XNARROW)) {
             val = U16_LOBYTE(val);
+            cpu.y &= 0xff00;
+        } else {
+            cpu.y &= 0;
         }
-        cpu.y = val;
+        cpu.y |= val;
         break;
     case R_S:
         cpu.s = val;
@@ -286,11 +295,17 @@ void cpu_execute(void) {
     case 0x18:
         clc(AM_IMP);
         break;
+    case 0x1a:
+        inc(AM_ACC);
+        break;
     case 0x1b:
         tcs(AM_IMP);
         break;
     case 0x20:
         jsr(AM_ABS);
+        break;
+    case 0x28:
+        plp(AM_STK);
         break;
     case 0x2a:
         rol(AM_ACC);
@@ -301,14 +316,23 @@ void cpu_execute(void) {
     case 0x48:
         pha(AM_STK);
         break;
+    case 0x58:
+        cli(AM_IMP);
+        break;
     case 0x5b:
         tcd(AM_IMP);
         break;
-        case 0x68:
+    case 0x60:
+        rts(AM_IMP);
+        break;
+    case 0x68:
         pla(AM_STK);
         break;
     case 0x69:
         adc(AM_IMM);
+        break;
+    case 0x70:
+        bvs(AM_PC_REL);
         break;
     case 0x78:
         sei(AM_IMP);
@@ -378,6 +402,12 @@ void cpu_execute(void) {
         break;
     case 0xe9:
         sbc(AM_IMM);
+        break;
+    case 0xeb:
+        xba(AM_IMP);
+        break;
+    case 0xf0:
+        beq(AM_PC_REL);
         break;
     case 0xfb:
         xce(AM_ACC);

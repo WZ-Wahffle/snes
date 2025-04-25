@@ -203,6 +203,7 @@ EXTERNC uint32_t resolve_addr(addressing_mode_t mode);
 EXTERNC uint16_t resolve_read8(addressing_mode_t mode);
 EXTERNC uint16_t resolve_read16(addressing_mode_t mode, bool respect_x,
                                 bool respect_m);
+EXTERNC uint16_t spc_resolve_addr(spc_addressing_mode_t mode);
 EXTERNC uint8_t spc_resolve_read(spc_addressing_mode_t mode);
 EXTERNC void spc_resolve_write(spc_addressing_mode_t mode, uint8_t val);
 
@@ -223,6 +224,8 @@ EXTERNC uint8_t spc_read_8(uint16_t addr);
 EXTERNC uint16_t spc_read_16(uint16_t addr);
 EXTERNC uint8_t spc_next_8(void);
 EXTERNC void spc_write_8(uint16_t addr, uint8_t val);
+EXTERNC void spc_write_16(uint16_t addr, uint16_t val);
+
 
 static void log_message(log_level_t level, char *message, ...) {
 #ifdef LOG_LEVEL

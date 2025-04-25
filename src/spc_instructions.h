@@ -11,10 +11,24 @@
 
 OP(lda);
 OP(ldx);
+OP(ldy);
+OP(ldw);
 OP(sta);
+OP(sty);
+OP(stw);
 OP(txs);
+OP(tax);
+OP(tya);
+OP(inx);
 OP(dex);
+OP(iny);
+OP(dey);
+OP(bra);
 OP(bne);
+OP(bpl);
+OP(jmp);
 OP(mov);
 OP(cmp);
+OP(cpy);
+OP(inc);
 #endif

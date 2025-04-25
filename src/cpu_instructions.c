@@ -36,6 +36,11 @@ OP(sei) {
     set_status_bit(STATUS_IRQOFF, true);
 }
 
+OP(cli) {
+    LEGALADDRMODES(AM_IMP);
+    set_status_bit(STATUS_IRQOFF, false);
+}
+
 OP(stz) {
     LEGALADDRMODES(AM_ABS | AM_ABSX | AM_DIR | AM_ZBKX_DIR);
 
@@ -79,6 +84,19 @@ OP(xce) {
     bool tmp = cpu.emulation_mode;
     cpu.emulation_mode = get_status_bit(STATUS_CARRY);
     set_status_bit(STATUS_CARRY, tmp);
+}
+
+OP(xba) {
+    LEGALADDRMODES(AM_IMP);
+    // register write functions are not used because this works despite
+    // emulation flag
+    uint8_t lsb = U16_HIBYTE(cpu.c);
+    uint8_t msb = U16_LOBYTE(cpu.c);
+    cpu.c = TO_U16(lsb, msb);
+    set_status_bit(STATUS_ZERO, cpu.c == 0);
+    set_status_bit(STATUS_NEGATIVE, get_status_bit(STATUS_MEMNARROW)
+                                        ? (cpu.c & 0x80)
+                                        : (cpu.c & 0x8000));
 }
 
 OP(rep) {
@@ -326,6 +344,31 @@ OP(cpx) {
                                         : (result & 0x8000));
 }
 
+OP(inc) {
+    LEGALADDRMODES(AM_ABS | AM_ACC | AM_ABSX | AM_DIR | AM_ZBKX_DIR);
+    if(mode == AM_ACC) {
+        uint16_t val = read_r(R_C) + 1;
+        write_r(R_C, val);
+        set_status_bit(STATUS_ZERO, read_r(R_C) == 0);
+        set_status_bit(STATUS_NEGATIVE, get_status_bit(STATUS_MEMNARROW)
+                                            ? (read_r(R_C) & 0x80)
+                                            : (read_r(R_C) & 0x8000));
+    } else {
+        uint32_t addr = resolve_addr(mode);
+        if(cpu.emulation_mode) {
+            uint8_t val = read_8(U24_LOSHORT(addr), U24_HIBYTE(addr)) + 1;
+            write_8(U24_LOSHORT(addr), U24_HIBYTE(addr), val);
+            set_status_bit(STATUS_ZERO, val == 0);
+            set_status_bit(STATUS_NEGATIVE, val & 0x80);
+        } else {
+            uint16_t val = read_16(U24_LOSHORT(addr), U24_HIBYTE(addr)) + 1;
+            write_16(U24_LOSHORT(addr), U24_HIBYTE(addr), val);
+            set_status_bit(STATUS_ZERO, val == 0);
+            set_status_bit(STATUS_NEGATIVE, val & 0x8000);
+        }
+    }
+}
+
 OP(inx) {
     LEGALADDRMODES(AM_IMP);
     uint16_t val = read_r(R_X);
@@ -384,9 +427,27 @@ OP(bpl) {
     }
 }
 
+OP(beq) {
+    LEGALADDRMODES(AM_PC_REL);
+    if (get_status_bit(STATUS_ZERO)) {
+        cpu.pc = resolve_addr(mode);
+    } else {
+        cpu.pc++;
+    }
+}
+
 OP(bne) {
     LEGALADDRMODES(AM_PC_REL);
     if (!get_status_bit(STATUS_ZERO)) {
+        cpu.pc = resolve_addr(mode);
+    } else {
+        cpu.pc++;
+    }
+}
+
+OP(bvs) {
+    LEGALADDRMODES(AM_PC_REL);
+    if (get_status_bit(STATUS_OVERFLOW)) {
         cpu.pc = resolve_addr(mode);
     } else {
         cpu.pc++;
@@ -400,9 +461,19 @@ OP(jsr) {
     cpu.pc = addr;
 }
 
+OP(rts) {
+    LEGALADDRMODES(AM_IMP);
+    cpu.pc = pop_16();
+}
+
 OP(php) {
     LEGALADDRMODES(AM_STK);
     push_8(cpu.p);
+}
+
+OP(plp) {
+    LEGALADDRMODES(AM_STK);
+    cpu.p = pop_8();
 }
 
 OP(pha) {

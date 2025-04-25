@@ -57,6 +57,25 @@ uint8_t spc_resolve_read(spc_addressing_mode_t mode) {
     }
 }
 
+uint16_t spc_resolve_addr(spc_addressing_mode_t mode) {
+    switch (mode) {
+    case SM_ABS:
+        return spc_next_16();
+    case SM_DIR_PAGE:
+        return spc_next_8() + spc_get_status_bit(STATUS_DIRECTPAGE) * 0x100;
+    case SM_DIR_PAGEX:
+        return (spc_next_8() + spc.x) % 0x100 +
+               spc_get_status_bit(STATUS_DIRECTPAGE) * 0x100;
+    case SM_DIR_PAGEY:
+        return (spc_next_8() + spc.y) % 0x100 +
+               spc_get_status_bit(STATUS_DIRECTPAGE) * 0x100;
+    case SM_ABS_INDX:
+        return spc_read_16(spc_next_16() + spc.x);
+    default:
+        UNREACHABLE_SWITCH(mode);
+    }
+}
+
 void spc_resolve_write(spc_addressing_mode_t mode, uint8_t val) {
     switch (mode) {
     case SM_DIR_PAGE:
@@ -79,6 +98,9 @@ void spc_resolve_write(spc_addressing_mode_t mode, uint8_t val) {
         break;
     case SM_INDIRECT:
         spc_write_8(spc.x + spc_get_status_bit(STATUS_DIRECTPAGE) * 0x100, val);
+        break;
+    case SM_INDY:
+        spc_write_8(spc.y + spc_read_16(spc_next_8()), val);
         break;
     default:
         UNREACHABLE_SWITCH(mode);
@@ -109,20 +131,47 @@ void spc_execute(void) {
     // multiplied by 21 which is roughly accurate to the lower clock frequency
     spc.remaining_clocks -= 21 * spc_cycle_counts[opcode];
     switch (opcode) {
+    case 0x10:
+        spc_bpl(SM_REL);
+        break;
     case 0x1d:
         spc_dex(SM_IMP);
+        break;
+    case 0x1f:
+        spc_jmp(SM_ABS_INDX);
+        break;
+    case 0x2f:
+        spc_bra(SM_REL);
+        break;
+    case 0x5d:
+        spc_tax(SM_IMP);
         break;
     case 0x78:
         spc_cmp(SM_IMM_TO_DIR_PAGE);
         break;
+    case 0x7e:
+        spc_cpy(SM_DIR_PAGE);
+        break;
     case 0x8f:
         spc_mov(SM_IMM_TO_DIR_PAGE);
+        break;
+    case 0xab:
+        spc_inc(SM_DIR_PAGE);
+        break;
+    case 0xba:
+        spc_ldw(SM_DIR_PAGE);
         break;
     case 0xbd:
         spc_txs(SM_IMP);
         break;
+    case 0xc4:
+        spc_sta(SM_DIR_PAGE);
+        break;
     case 0xc6:
         spc_sta(SM_INDIRECT);
+        break;
+    case 0xcb:
+        spc_sty(SM_DIR_PAGE);
         break;
     case 0xcd:
         spc_ldx(SM_IMM);
@@ -130,8 +179,26 @@ void spc_execute(void) {
     case 0xd0:
         spc_bne(SM_REL);
         break;
+    case 0xd7:
+        spc_sta(SM_INDY);
+        break;
+    case 0xda:
+        spc_stw(SM_DIR_PAGE);
+        break;
+    case 0xdd:
+        spc_tya(SM_IMP);
+        break;
+    case 0xe4:
+        spc_lda(SM_DIR_PAGE);
+        break;
     case 0xe8:
         spc_lda(SM_IMM);
+        break;
+    case 0xeb:
+        spc_ldy(SM_DIR_PAGE);
+        break;
+    case 0xfc:
+        spc_iny(SM_IMP);
         break;
     default:
         UNREACHABLE_SWITCH(opcode);

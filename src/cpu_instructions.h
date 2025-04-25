@@ -10,11 +10,13 @@
            addressing_mode_strings[(uint8_t)log2(mode)])
 
 OP(sei);
+OP(cli);
 OP(stz);
 OP(lda);
 OP(sta);
 OP(clc);
 OP(xce);
+OP(xba);
 OP(rep);
 OP(sep);
 OP(tcd);
@@ -29,15 +31,20 @@ OP(adc);
 OP(sbc);
 OP(cmp);
 OP(cpx);
+OP(inc);
 OP(inx);
 OP(dex);
 OP(iny);
 OP(dey);
 OP(bra);
 OP(bpl);
+OP(beq);
 OP(bne);
+OP(bvs);
 OP(jsr);
+OP(rts);
 OP(php);
+OP(plp);
 OP(pha);
 OP(pla);
 OP(rol);
