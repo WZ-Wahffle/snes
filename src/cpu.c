@@ -102,6 +102,13 @@ void set_status_bit(status_bit_t bit, bool value) {
     }
 }
 
+bool get_status_bit(status_bit_t bit) {
+    if (cpu.emulation_mode) {
+        cpu.p |= 0b110000;
+    }
+    return cpu.p & (1 << bit);
+}
+
 void push_8(uint8_t val) { write_8(cpu.s--, 0, val); }
 void push_16(uint16_t val) {
     push_8(U16_HIBYTE(val));
@@ -119,13 +126,6 @@ uint16_t pop_16(void) {
 uint32_t pop_24(void) {
     uint16_t lss = pop_16();
     return TO_U24(lss, pop_8());
-}
-
-bool get_status_bit(status_bit_t bit) {
-    if (cpu.emulation_mode) {
-        cpu.p |= 0b110000;
-    }
-    return cpu.p & (1 << bit);
 }
 
 uint32_t resolve_addr(addressing_mode_t mode) {

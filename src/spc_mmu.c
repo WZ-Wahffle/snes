@@ -15,11 +15,19 @@ uint8_t ipl_boot_rom[] = {
 uint8_t spc_mmu_read(uint16_t addr) {
     if (addr >= 0xffc0) {
         return ipl_boot_rom[addr - 0xffc0];
+    } else if (addr >= 0xf0 && addr < 0x100) {
+        switch (addr) {
+            case 0xf4:
+            case 0xf5:
+            case 0xf6:
+            case 0xf7:
+            return cpu.memory.apu_io[addr - 0xf4];
+        default:
+            UNREACHABLE_SWITCH(addr);
+        }
     }
 
-    ASSERT(0, "SPC read from 0x%04x not allowed", addr);
+    return spc.memory.ram[addr];
 }
 
-void spc_mmu_write(uint16_t addr, uint8_t val) {
-    ASSERT(0, "SPC write of 0x%02x to 0x%04x not allowed", val, addr);
-}
+void spc_mmu_write(uint16_t addr, uint8_t val) { spc.memory.ram[addr] = val; }

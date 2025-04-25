@@ -83,7 +83,7 @@ uint8_t mmu_read(uint16_t addr, uint8_t bank) {
             case 0x2141:
             case 0x2142:
             case 0x2143:
-                return spc.memory.apu_io[addr - 0x2140];
+                return spc.memory.ram[0xf4 + (addr - 0x2140)];
                 break;
             default:
                 UNREACHABLE_SWITCH(addr);

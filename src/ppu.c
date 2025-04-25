@@ -24,6 +24,9 @@ void try_step_cpu(void) {
 void try_step_spc(void) {
     if (spc.remaining_clocks > 0) {
         spc_execute();
+        if(spc.breakpoint_valid && spc.pc == spc.breakpoint) {
+            cpu.state = STATE_STOPPED;
+        }
     }
 }
 

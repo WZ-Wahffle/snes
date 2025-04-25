@@ -65,6 +65,7 @@ void cpu_window(void) {
 }
 
 bool show_spc_window = false;
+char spc_bp_inter[5] = {0};
 void spc_window(void) {
     ImGui::Begin("spc", NULL);
     ImGui::SetWindowFontScale(2);
@@ -74,6 +75,24 @@ void spc_window(void) {
     ImGui::Text("Y: 0x%02x", spc.y);
     ImGui::Text("SP: 0x%02x", spc.s);
     ImGui::Text("P: 0x%02x", spc.p);
+    ImGui::Text("Breakpoint: 0x");
+    ImGui::SameLine();
+    ImGui::PushItemWidth(4 * ImGui::GetFontSize());
+    ImGui::InputText("##spcbpin", spc_bp_inter, 5);
+    ImGui::PopItemWidth();
+    spc.breakpoint_valid = true;
+    for (char &c : spc_bp_inter) {
+        if ((c < '0' || c > '9') && (c < 'a' || c > 'f') &&
+            (c < 'A' || c > 'F'))
+            spc.breakpoint_valid = false;
+        break;
+    }
+    if (!spc.breakpoint_valid) {
+        ImGui::SameLine();
+        ImGui::TextColored(ImVec4{0xff, 0, 0, 0xff}, "Invalid!");
+    } else {
+        spc.breakpoint = strtoul(spc_bp_inter, NULL, 16);
+    }
     ImGui::End();
 }
 

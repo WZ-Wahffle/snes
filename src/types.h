@@ -82,6 +82,30 @@ typedef enum {
 } addressing_mode_t;
 
 typedef enum {
+    SM_DIR_PAGE = 1,              // Direct Page - d
+    SM_DIR_PAGEX = 2,             // X-Indexed Direct Page - d,X
+    SM_DIR_PAGEY = 4,             // Y-Indexed Direct Page - d,Y
+    SM_INDIRECT = 8,              // Indirect - (X)
+    SM_INDIRECT_INC = 16,         // Indirect Auto-Increment - (X)+
+    SM_DIR_PAGE_TO_DIR_PAGE = 32, // Direct Page to Direct Page - dd,ds
+    SM_IND_PAGE_TO_IND_PAGE = 64, // Indirect Page to Indirect Page - (X),(Y)
+    SM_IMM_TO_DIR_PAGE = 128,     // Immediate Data to Direct Page - d,#
+    SM_DIR_PAGE_BIT = 256,        // Direct Page Bit - d.b
+    SM_DIR_PAGE_BIT_REL = 512,    // Direct Page Bit Relative - d.b,r
+    SM_ABS_BOOL_BIT = 1024,       // Absolute Boolean Bit - m.b
+    SM_ABS = 2048,                // Absolute - a
+    SM_ABS_INDX = 4096,           // Absolute X-Indexed Indirect - (a,X)
+    SM_ABSX = 8192,               // X-Indexed Absolute - a,X
+    SM_ABSY = 16384,              // Y-Indexed Absolute - a,Y
+    SM_INDX = 32768,              // X-Indexed Indirect - (d,X)
+    SM_INDY = 65536,              // Indirect Y-Indexed - (d),Y
+    SM_REL = 131072,              // Relative - r
+    SM_IMM = 262144,              // Immediate - #
+    SM_ACC = 524288,              // Accumulator - A
+    SM_IMP = 1048576,             // Implied
+} spc_addressing_mode_t;
+
+typedef enum {
     STATUS_CARRY,
     STATUS_ZERO,
     STATUS_IRQOFF,
@@ -89,7 +113,10 @@ typedef enum {
     STATUS_XNARROW,
     STATUS_MEMNARROW,
     STATUS_OVERFLOW,
-    STATUS_NEGATIVE
+    STATUS_NEGATIVE,
+    STATUS_HALFCARRY = 3, // extra flags for the SPC700
+    STATUS_BREAK = 4,
+    STATUS_DIRECTPAGE = 5,
 } status_bit_t;
 
 typedef enum { STATE_STOPPED, STATE_STEPPED, STATE_RUNNING } emu_state_t;
@@ -144,7 +171,7 @@ typedef struct {
 } cpu_t;
 
 typedef struct {
-    uint8_t apu_io[4];
+    uint8_t ram[0x10000];
 } spc_mmu_t;
 
 typedef struct {
@@ -152,6 +179,8 @@ typedef struct {
     uint8_t a, x, y, s, p;
     uint16_t pc;
     double remaining_clocks;
+    bool breakpoint_valid;
+    uint16_t breakpoint;
 } spc_t;
 
 typedef struct {
@@ -168,10 +197,14 @@ typedef struct {
 #endif
 EXTERNC void set_status_bit(status_bit_t bit, bool value);
 EXTERNC bool get_status_bit(status_bit_t bit);
+EXTERNC void spc_set_status_bit(status_bit_t bit, bool value);
+EXTERNC bool spc_get_status_bit(status_bit_t bit);
 EXTERNC uint32_t resolve_addr(addressing_mode_t mode);
 EXTERNC uint16_t resolve_read8(addressing_mode_t mode);
 EXTERNC uint16_t resolve_read16(addressing_mode_t mode, bool respect_x,
                                 bool respect_m);
+EXTERNC uint8_t spc_resolve_read(spc_addressing_mode_t mode);
+EXTERNC void spc_resolve_write(spc_addressing_mode_t mode, uint8_t val);
 
 EXTERNC uint8_t read_8(uint16_t addr, uint8_t bank);
 EXTERNC uint16_t read_16(uint16_t addr, uint8_t bank);
@@ -188,6 +221,8 @@ EXTERNC uint16_t pop_16(void);
 EXTERNC uint32_t pop_24(void);
 EXTERNC uint8_t spc_read_8(uint16_t addr);
 EXTERNC uint16_t spc_read_16(uint16_t addr);
+EXTERNC uint8_t spc_next_8(void);
+EXTERNC void spc_write_8(uint16_t addr, uint8_t val);
 
 static void log_message(log_level_t level, char *message, ...) {
 #ifdef LOG_LEVEL
