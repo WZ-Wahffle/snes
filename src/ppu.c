@@ -1,8 +1,10 @@
 #include "ppu.h"
 #include "raylib.h"
+#include "spc.h"
 
 extern cpu_t cpu;
 extern ppu_t ppu;
+extern spc_t spc;
 
 void *framebuffer[WINDOW_WIDTH * WINDOW_HEIGHT * 4] = {0};
 
@@ -13,10 +15,15 @@ void set_pixel(uint16_t x, uint16_t y, uint32_t color) {
 void try_step_cpu(void) {
     if (cpu.remaining_clocks > 0) {
         cpu_execute();
-        if (cpu.breakpoint_valid &&
-            TO_U24(cpu.pc, cpu.pbr) == cpu.breakpoint) {
+        if (cpu.breakpoint_valid && TO_U24(cpu.pc, cpu.pbr) == cpu.breakpoint) {
             cpu.state = STATE_STOPPED;
         }
+    }
+}
+
+void try_step_spc(void) {
+    if (spc.remaining_clocks > 0) {
+        spc_execute();
     }
 }
 
@@ -66,22 +73,29 @@ void ui(void) {
                 break;
             case STATE_STEPPED:
                 ppu.remaining_clocks += (-cpu.remaining_clocks) + 1;
+                spc.remaining_clocks += (-cpu.remaining_clocks) + 1;
                 cpu.remaining_clocks = 1;
                 cpu.state = STATE_STOPPED;
                 try_step_cpu();
                 try_step_ppu();
+                while (spc.remaining_clocks > 0) {
+                    try_step_spc();
+                }
                 break;
             case STATE_RUNNING:
                 cpu.remaining_clocks += CYCLES_PER_DOT;
                 ppu.remaining_clocks += CYCLES_PER_DOT;
+                spc.remaining_clocks += CYCLES_PER_DOT;
                 while (cpu.remaining_clocks > 0 && cpu.state != STATE_STOPPED) {
                     try_step_cpu();
+                }
+                while (spc.remaining_clocks > 0 && cpu.state != STATE_STOPPED) {
+                    try_step_spc();
                 }
                 try_step_ppu();
                 break;
             }
         }
-
 
         UpdateTexture(texture, framebuffer);
         DrawTexturePro(texture, (Rectangle){0, 0, WINDOW_WIDTH, WINDOW_HEIGHT},

@@ -151,6 +151,7 @@ typedef struct {
     spc_mmu_t memory;
     uint8_t a, x, y, s, p;
     uint16_t pc;
+    double remaining_clocks;
 } spc_t;
 
 typedef struct {
@@ -185,6 +186,8 @@ EXTERNC void push_24(uint32_t val);
 EXTERNC uint8_t pop_8(void);
 EXTERNC uint16_t pop_16(void);
 EXTERNC uint32_t pop_24(void);
+EXTERNC uint8_t spc_read_8(uint16_t addr);
+EXTERNC uint16_t spc_read_16(uint16_t addr);
 
 static void log_message(log_level_t level, char *message, ...) {
 #ifdef LOG_LEVEL

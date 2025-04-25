@@ -270,6 +270,10 @@ void cpu_execute(void) {
     uint8_t opcode = next_8();
     log_message(LOG_LEVEL_VERBOSE, "CPU fetched opcode 0x%02x", opcode);
     // TODO: disambiguate cpu cycles taking 6, 8 or 12 clock cycles
+
+    // remaining clocks increments at 341 * 262 * 60 * 4 = 21.44MHz.
+    // The highest achievable CPU clock speed is roughly 3.58 MHz, which
+    // corresponds to 6 master clocks per CPU clock, hence the factor of 6
     cpu.remaining_clocks -= 6 * cpu_cycle_counts[opcode];
     switch (opcode) {
     case 0x08:

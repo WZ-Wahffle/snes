@@ -1,5 +1,6 @@
 #include "cpu.h"
 #include "ppu.h"
+#include "spc.h"
 #include "types.h"
 
 extern cpu_t cpu;
@@ -136,6 +137,7 @@ int main(int argc, char **argv) {
     memcpy(cpu.memory.rom, file_to_hash, file_size);
     cpu.memory.mode = mode;
     cpu_reset();
+    spc_reset();
     ui();
 
     free(cpu.memory.sram);

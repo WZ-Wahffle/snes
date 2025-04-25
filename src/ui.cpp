@@ -6,6 +6,7 @@
 
 extern cpu_t cpu;
 extern ppu_t ppu;
+extern spc_t spc;
 
 bool show_cpu_window = false;
 char bp_inter[7] = {0};
@@ -42,24 +43,37 @@ void cpu_window(void) {
     ImGui::NewLine();
 
     ImGui::Text("Breakpoint: 0x");
+    ImGui::SameLine();
+    ImGui::PushItemWidth(4 * ImGui::GetFontSize());
+    ImGui::InputText("##bpin", bp_inter, 7);
+    ImGui::PopItemWidth();
+    cpu.breakpoint_valid = true;
+    for (char &c : bp_inter) {
+        if ((c < '0' || c > '9') && (c < 'a' || c > 'f') &&
+            (c < 'A' || c > 'F'))
+            cpu.breakpoint_valid = false;
+        break;
+    }
+    if (!cpu.breakpoint_valid) {
         ImGui::SameLine();
-        ImGui::PushItemWidth(4 * ImGui::GetFontSize());
-        ImGui::InputText("##bpin", bp_inter, 7);
-        ImGui::PopItemWidth();
-        cpu.breakpoint_valid = true;
-        for (char &c : bp_inter) {
-            if ((c < '0' || c > '9') && (c < 'a' || c > 'f') &&
-                (c < 'A' || c > 'F'))
-                cpu.breakpoint_valid = false;
-            break;
-        }
-        if (!cpu.breakpoint_valid) {
-            ImGui::SameLine();
-            ImGui::TextColored(ImVec4{0xff, 0, 0, 0xff}, "Invalid!");
-        } else {
-            cpu.breakpoint = strtoul(bp_inter, NULL, 16);
-        }
+        ImGui::TextColored(ImVec4{0xff, 0, 0, 0xff}, "Invalid!");
+    } else {
+        cpu.breakpoint = strtoul(bp_inter, NULL, 16);
+    }
 
+    ImGui::End();
+}
+
+bool show_spc_window = false;
+void spc_window(void) {
+    ImGui::Begin("spc", NULL);
+    ImGui::SetWindowFontScale(2);
+    ImGui::Text("PC: 0x%04x Opcode: 0x%02x", spc.pc, spc_read_8(spc.pc));
+    ImGui::Text("A: 0x%02x", spc.a);
+    ImGui::Text("X: 0x%02x", spc.x);
+    ImGui::Text("Y: 0x%02x", spc.y);
+    ImGui::Text("SP: 0x%02x", spc.s);
+    ImGui::Text("P: 0x%02x", spc.p);
     ImGui::End();
 }
 
@@ -74,10 +88,15 @@ void cpp_imgui_render(void) {
     if (ImGui::Button("CPU"))
         show_cpu_window = !show_cpu_window;
 
+    if (ImGui::Button("SPC"))
+        show_spc_window = !show_spc_window;
     ImGui::End();
 
     if (show_cpu_window)
         cpu_window();
+
+    if (show_spc_window)
+        spc_window();
     rlImGuiEnd();
 }
 

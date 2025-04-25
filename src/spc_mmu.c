@@ -13,8 +13,8 @@ uint8_t ipl_boot_rom[] = {
     0xdd, 0x5d, 0xd0, 0xdb, 0x1f, 0x00, 0x00, 0xc0, 0xff};
 
 uint8_t spc_mmu_read(uint16_t addr) {
-    if (addr >= 0xffc0 && addr < 0xffff) {
-        return ipl_boot_rom[addr - 0xfc00];
+    if (addr >= 0xffc0) {
+        return ipl_boot_rom[addr - 0xffc0];
     }
 
     ASSERT(0, "SPC read from 0x%04x not allowed", addr);
