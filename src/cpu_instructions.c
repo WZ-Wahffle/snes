@@ -74,6 +74,17 @@ OP(sta) {
     }
 }
 
+OP(sty) {
+    LEGALADDRMODES(AM_ABS | AM_DIR | AM_ZBKX_DIR);
+    uint32_t addr = resolve_addr(mode);
+    uint16_t val = read_r(R_Y);
+    if (get_status_bit(STATUS_XNARROW)) {
+        write_8(U24_LOSHORT(addr), U24_HIBYTE(addr), val);
+    } else {
+        write_16(U24_LOSHORT(addr), U24_HIBYTE(addr), val);
+    }
+}
+
 OP(clc) {
     LEGALADDRMODES(AM_IMP);
     set_status_bit(STATUS_CARRY, false);
@@ -346,7 +357,7 @@ OP(cpx) {
 
 OP(inc) {
     LEGALADDRMODES(AM_ABS | AM_ACC | AM_ABSX | AM_DIR | AM_ZBKX_DIR);
-    if(mode == AM_ACC) {
+    if (mode == AM_ACC) {
         uint16_t val = read_r(R_C) + 1;
         write_r(R_C, val);
         set_status_bit(STATUS_ZERO, read_r(R_C) == 0);
@@ -355,7 +366,7 @@ OP(inc) {
                                             : (read_r(R_C) & 0x8000));
     } else {
         uint32_t addr = resolve_addr(mode);
-        if(cpu.emulation_mode) {
+        if (cpu.emulation_mode) {
             uint8_t val = read_8(U24_LOSHORT(addr), U24_HIBYTE(addr)) + 1;
             write_8(U24_LOSHORT(addr), U24_HIBYTE(addr), val);
             set_status_bit(STATUS_ZERO, val == 0);
@@ -413,6 +424,22 @@ OP(dey) {
                                         : (cpu.y & 0x8000));
 }
 
+OP(and_) {
+    LEGALADDRMODES(AM_ABS | AM_ABSX | AM_ABSY | AM_ABS_L | AM_ABSX_L | AM_DIR |
+                   AM_STK_REL | AM_ZBKX_DIR | AM_IND_DIR | AM_IND_DIR_L |
+                   AM_STK_REL_INDY | AM_INDX_DIR | AM_INDY_DIR | AM_INDY_DIR_L |
+                   AM_IMM);
+    if (get_status_bit(STATUS_MEMNARROW)) {
+        write_r(R_C, read_r(R_C) & resolve_read8(mode));
+    } else {
+        write_r(R_C, read_r(R_C) & resolve_read16(mode, false, false));
+    }
+    set_status_bit(STATUS_ZERO, read_r(R_C) == 0);
+    set_status_bit(STATUS_NEGATIVE, get_status_bit(STATUS_MEMNARROW)
+                                        ? (read_r(R_C) & 0x80)
+                                        : (read_r(R_C) & 0x8000));
+}
+
 OP(bra) {
     LEGALADDRMODES(AM_PC_REL);
     cpu.pc = resolve_addr(mode);
@@ -454,16 +481,54 @@ OP(bvs) {
     }
 }
 
+OP(jmp) {
+    LEGALADDRMODES(AM_ABS | AM_IND | AM_INDX);
+    uint32_t addr = resolve_addr(mode);
+    if (mode == AM_ABS) {
+        cpu.pc = addr;
+    } else if(mode == AM_IND) {
+        cpu.pc = read_16(U24_LOSHORT(addr), 0);
+    } else {
+        cpu.pc = read_16(U24_LOSHORT(addr), cpu.pbr);
+    }
+}
+
+OP(jml) {
+    LEGALADDRMODES(AM_IND | AM_ABS_L);
+    uint32_t addr = resolve_addr(mode);
+    if (mode == AM_IND) {
+        cpu.pc = read_24(U24_LOSHORT(addr), U24_HIBYTE(addr));
+    } else {
+        cpu.pc = addr;
+    }
+}
+
 OP(jsr) {
     LEGALADDRMODES(AM_ABS | AM_INDX);
     uint16_t addr = resolve_addr(mode);
-    push_16(cpu.pc);
+    push_16(cpu.pc - 1);
     cpu.pc = addr;
+}
+
+OP(jsl) {
+    LEGALADDRMODES(AM_ABS_L);
+    uint32_t addr = resolve_addr(mode);
+    push_8(cpu.pbr);
+    push_16(cpu.pc - 1);
+    cpu.pc = U24_LOSHORT(addr);
+    cpu.pbr = U24_HIBYTE(addr);
 }
 
 OP(rts) {
     LEGALADDRMODES(AM_IMP);
-    cpu.pc = pop_16();
+    cpu.pc = pop_16() + 1;
+}
+
+OP(rtl) {
+    LEGALADDRMODES(AM_IMP);
+    uint32_t addr = pop_24() + 1;
+    cpu.pbr = U24_HIBYTE(addr);
+    cpu.pc = U24_LOSHORT(addr);
 }
 
 OP(php) {
@@ -498,6 +563,19 @@ OP(pla) {
                                         : read_r(R_C) & 0x8000);
 }
 
+OP(ply) {
+    LEGALADDRMODES(AM_STK);
+    if (get_status_bit(STATUS_XNARROW)) {
+        write_r(R_Y, pop_8());
+    } else {
+        write_r(R_Y, pop_16());
+    }
+    set_status_bit(STATUS_ZERO, read_r(R_Y) == 0);
+    set_status_bit(STATUS_NEGATIVE, get_status_bit(STATUS_XNARROW)
+                                        ? (read_r(R_Y) & 0x80)
+                                        : read_r(R_Y) & 0x8000);
+}
+
 OP(rol) {
     LEGALADDRMODES(AM_ABS | AM_ACC | AM_ABSX | AM_DIR | AM_ZBKX_DIR);
     if (mode == AM_ACC) {
@@ -527,6 +605,39 @@ OP(rol) {
                                0x8000);
             uint16_t result =
                 (read_16(U24_LOSHORT(addr), U24_HIBYTE(addr)) << 1) | carry;
+            write_16(U24_LOSHORT(addr), U24_HIBYTE(addr), result);
+            set_status_bit(STATUS_ZERO, result == 0);
+            set_status_bit(STATUS_NEGATIVE, result & 0x8000);
+        }
+    }
+}
+
+OP(asl) {
+    LEGALADDRMODES(AM_ABS | AM_ACC | AM_ABSX | AM_DIR | AM_ZBKX_DIR);
+    if (mode == AM_ACC) {
+        set_status_bit(STATUS_CARRY, get_status_bit(STATUS_MEMNARROW)
+                                         ? (read_r(R_C) & 0x80)
+                                         : read_r(R_C) & 0x8000);
+        write_r(R_C, read_r(R_C) << 1);
+        set_status_bit(STATUS_ZERO, read_r(R_C) == 0);
+        set_status_bit(STATUS_NEGATIVE, get_status_bit(STATUS_MEMNARROW)
+                                            ? (read_r(R_C) & 0x80)
+                                            : read_r(R_C) & 0x8000);
+    } else {
+        uint32_t addr = resolve_addr(mode);
+        if (cpu.emulation_mode) {
+            set_status_bit(STATUS_CARRY,
+                           read_8(U24_LOSHORT(addr), U24_HIBYTE(addr)) & 0x80);
+            uint8_t result = read_8(U24_LOSHORT(addr), U24_HIBYTE(addr)) << 1;
+            write_8(U24_LOSHORT(addr), U24_HIBYTE(addr), result);
+            set_status_bit(STATUS_ZERO, result == 0);
+            set_status_bit(STATUS_NEGATIVE, result & 0x80);
+        } else {
+            set_status_bit(STATUS_CARRY,
+                           read_16(U24_LOSHORT(addr), U24_HIBYTE(addr)) &
+                               0x8000);
+            uint16_t result =
+                (read_16(U24_LOSHORT(addr), U24_HIBYTE(addr)) << 1);
             write_16(U24_LOSHORT(addr), U24_HIBYTE(addr), result);
             set_status_bit(STATUS_ZERO, result == 0);
             set_status_bit(STATUS_NEGATIVE, result & 0x8000);

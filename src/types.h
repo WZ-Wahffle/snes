@@ -171,6 +171,18 @@ typedef struct {
 } cpu_t;
 
 typedef struct {
+    int8_t vol_left, vol_right;
+    uint16_t pitch;
+    uint8_t sample_source_directory;
+    bool adsr_enable;
+    uint8_t a_rate, d_rate, s_rate, r_rate;
+    uint8_t gain;
+
+    uint8_t envx;
+    int8_t outx;
+} dsp_channel_t;
+
+typedef struct {
     uint8_t ram[0x10000];
     struct spc_timer_t {
         bool enable;
@@ -178,6 +190,24 @@ typedef struct {
         uint8_t counter;
         uint8_t timer_internal;
     } timers[3];
+    dsp_channel_t channels[8];
+    uint8_t coefficients[8];
+    int8_t vol_left, vol_right, echo_left, echo_right;
+    uint8_t endx;
+    uint8_t echo_feedback, echo_delay;
+    uint8_t pitch_mod_enable;
+    uint8_t use_noise;
+    uint8_t echo_enable;
+    uint8_t sample_source_directory_page;
+    uint8_t echo_start_address;
+    uint8_t key_on, key_off;
+
+    bool mute_voices;
+    bool mute_all;
+    bool disable_echo_write;
+    uint8_t noise_freq;
+
+    uint8_t dsp_addr;
 } spc_mmu_t;
 
 typedef struct {
@@ -193,8 +223,16 @@ typedef struct {
 typedef struct {
     bool force_blanking;
     uint8_t brightness;
+    uint8_t obj_sprite_size;
+    uint8_t name_select;
+    uint8_t name_base_address;
+    uint8_t address_increment_amount, address_remapping;
+    bool address_increment_mode;
     double remaining_clocks;
     uint16_t beam_x, beam_y;
+
+    uint16_t vram_addr;
+    uint8_t vram[0x10000];
 } ppu_t;
 
 #ifdef __cplusplus

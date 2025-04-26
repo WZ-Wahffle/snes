@@ -260,9 +260,8 @@ OP(cmp) {
         op2 = spc_read_8(spc_next_8() +
                          spc_get_status_bit(STATUS_DIRECTPAGE) * 0x100);
     } else if (mode == SM_IND_PAGE_TO_IND_PAGE) {
-        op1 = spc_read_8(spc.x);
-        op2 = spc_read_8(spc.y);
-        TODO("check if indirect access is susceptible to direct page bit");
+        op1 = spc_read_8(spc.x + spc_get_status_bit(STATUS_DIRECTPAGE) * 0x100);
+        op2 = spc_read_8(spc.y + spc_get_status_bit(STATUS_DIRECTPAGE) * 0x100);
     } else {
         op1 = spc.a;
         op2 = spc_resolve_read(mode);
@@ -323,10 +322,9 @@ OP(adc) {
         dest = spc_next_8() + spc_get_status_bit(STATUS_DIRECTPAGE) * 0x100;
         op2 = spc_read_8(dest);
     } else if (mode == SM_IND_PAGE_TO_IND_PAGE) {
-        op1 = spc_read_8(spc.x);
-        op2 = spc_read_8(spc.y);
-        dest = spc.x;
-        TODO("check if indirect access is susceptible to direct page bit");
+        op1 = spc_read_8(spc.x + spc_get_status_bit(STATUS_DIRECTPAGE) * 0x100);
+        op2 = spc_read_8(spc.y + spc_get_status_bit(STATUS_DIRECTPAGE) * 0x100);
+        dest = spc.x + spc_get_status_bit(STATUS_DIRECTPAGE) * 0x100;
     } else {
         op1 = spc.a;
         op2 = spc_resolve_read(mode);

@@ -19,11 +19,43 @@ uint8_t spc_mmu_read(uint16_t addr, bool log) {
     } else if (addr >= 0xf0 && addr < 0x100) {
         switch (addr) {
         case 0xf2:
-        case 0xf3:
-            if (log)
-                log_message(LOG_LEVEL_INFO, "Read from DSP %s\n",
-                            addr == 0xf2 ? "addr" : "data");
-            break;
+            return spc.memory.dsp_addr;
+        case 0xf3: {
+            switch (spc.memory.dsp_addr % 16) {
+            case 0:
+                return spc.memory.channels[spc.memory.dsp_addr / 16].vol_left;
+            case 1:
+                return spc.memory.channels[spc.memory.dsp_addr / 16].vol_right;
+            case 2:
+                return U16_LOBYTE(
+                    spc.memory.channels[spc.memory.dsp_addr / 16].pitch);
+            case 3:
+                return U16_HIBYTE(
+                    spc.memory.channels[spc.memory.dsp_addr / 16].pitch);
+            case 4:
+                return spc.memory.channels[spc.memory.dsp_addr / 16]
+                    .sample_source_directory;
+            case 5:
+                return (spc.memory.channels[spc.memory.dsp_addr / 16]
+                            .adsr_enable
+                        << 7) |
+                       (spc.memory.channels[spc.memory.dsp_addr / 16].d_rate
+                        << 4) |
+                       (spc.memory.channels[spc.memory.dsp_addr / 16].a_rate);
+            case 6:
+                return (spc.memory.channels[spc.memory.dsp_addr / 16].s_rate
+                        << 5) |
+                       (spc.memory.channels[spc.memory.dsp_addr / 16].r_rate);
+            case 7:
+                return spc.memory.channels[spc.memory.dsp_addr / 16].gain;
+            case 8:
+                return spc.memory.channels[spc.memory.dsp_addr / 16].envx;
+            case 9:
+                return spc.memory.channels[spc.memory.dsp_addr / 16].outx;
+            default:
+                UNREACHABLE_SWITCH(spc.memory.dsp_addr % 16);
+            }
+        }
         case 0xf4:
         case 0xf5:
         case 0xf6:
@@ -64,11 +96,114 @@ void spc_mmu_write(uint16_t addr, uint8_t val, bool log) {
             }
             break;
         case 0xf2:
-        case 0xf3:
-            if (log)
-                log_message(LOG_LEVEL_INFO, "Write of 0x%02x to DSP %s", val,
-                            addr == 0xf2 ? "addr" : "data");
+            spc.memory.dsp_addr = val;
             break;
+        case 0xf3: {
+            if (spc.memory.dsp_addr % 16 >= 9) {
+                switch (spc.memory.dsp_addr) {
+                case 0x0c:
+                    spc.memory.vol_left = val;
+                    break;
+                case 0x1c:
+                    spc.memory.vol_right = val;
+                    break;
+                case 0x2c:
+                    spc.memory.echo_left = val;
+                    break;
+                case 0x3c:
+                    spc.memory.echo_right = val;
+                    break;
+                case 0x4c:
+                    spc.memory.key_on = val;
+                    break;
+                case 0x5c:
+                    spc.memory.key_off = val;
+                    break;
+                case 0x6c:
+                    spc.memory.mute_voices = val & 0x80;
+                    spc.memory.mute_all = val & 0x40;
+                    spc.memory.disable_echo_write = val & 0x20;
+                    spc.memory.noise_freq = val & 0x1f;
+                    break;
+                case 0x7c:
+                    spc.memory.endx = val;
+                    break;
+                case 0x0d:
+                    spc.memory.echo_feedback = val;
+                    break;
+                case 0x2d:
+                    spc.memory.pitch_mod_enable = val;
+                    break;
+                case 0x3d:
+                    spc.memory.use_noise = val;
+                    break;
+                case 0x4d:
+                    spc.memory.echo_enable = val;
+                    break;
+                case 0x5d:
+                    spc.memory.sample_source_directory_page = val;
+                    break;
+                case 0x6d:
+                    spc.memory.echo_start_address = val;
+                    break;
+                case 0x7d:
+                    spc.memory.echo_delay = val & 0xf;
+                    break;
+                default:
+                    UNREACHABLE_SWITCH(spc.memory.dsp_addr);
+                }
+            } else {
+                switch (spc.memory.dsp_addr % 16) {
+                case 0:
+                    spc.memory.channels[spc.memory.dsp_addr / 16].vol_left =
+                        val;
+                    break;
+                case 1:
+                    spc.memory.channels[spc.memory.dsp_addr / 16].vol_right =
+                        val;
+                    break;
+                case 2:
+                    spc.memory.channels[spc.memory.dsp_addr / 16].pitch &=
+                        0xff00;
+                    spc.memory.channels[spc.memory.dsp_addr / 16].pitch |= val;
+                    break;
+                case 3:
+                    spc.memory.channels[spc.memory.dsp_addr / 16].pitch &= 0xff;
+                    spc.memory.channels[spc.memory.dsp_addr / 16].pitch |= val
+                                                                           << 8;
+                    break;
+                case 4:
+                    spc.memory.channels[spc.memory.dsp_addr / 16]
+                        .sample_source_directory = val;
+                    break;
+                case 5:
+                    spc.memory.channels[spc.memory.dsp_addr / 16].adsr_enable =
+                        val & 0x80;
+                    spc.memory.channels[spc.memory.dsp_addr / 16].a_rate =
+                        val & 0xf;
+                    spc.memory.channels[spc.memory.dsp_addr / 16].d_rate =
+                        (val >> 4) & 0b111;
+                    break;
+                case 6:
+                    spc.memory.channels[spc.memory.dsp_addr / 16].s_rate =
+                        val >> 5;
+                    spc.memory.channels[spc.memory.dsp_addr / 16].r_rate =
+                        val & 0x1f;
+                    break;
+                case 7:
+                    spc.memory.channels[spc.memory.dsp_addr / 16].gain = val;
+                    break;
+                case 8:
+                    spc.memory.channels[spc.memory.dsp_addr / 16].envx = val;
+                    break;
+                case 9:
+                    spc.memory.channels[spc.memory.dsp_addr / 16].outx = val;
+                    break;
+                default:
+                    UNREACHABLE_SWITCH(spc.memory.dsp_addr % 16);
+                }
+            }
+        } break;
         case 0xf4:
         case 0xf5:
         case 0xf6:
