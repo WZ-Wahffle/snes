@@ -14,15 +14,28 @@ uint8_t ipl_boot_rom[] = {
 
 uint8_t spc_mmu_read(uint16_t addr, bool log) {
     (void)log;
-    if (addr >= 0xffc0) {
+    if (addr >= 0xffc0 && spc.enable_ipl) {
         return ipl_boot_rom[addr - 0xffc0];
     } else if (addr >= 0xf0 && addr < 0x100) {
         switch (addr) {
-            case 0xf4:
-            case 0xf5:
-            case 0xf6:
-            case 0xf7:
+        case 0xf2:
+        case 0xf3:
+            if (log)
+                log_message(LOG_LEVEL_INFO, "Read from DSP %s\n",
+                            addr == 0xf2 ? "addr" : "data");
+            break;
+        case 0xf4:
+        case 0xf5:
+        case 0xf6:
+        case 0xf7:
             return cpu.memory.apu_io[addr - 0xf4];
+        case 0xfd:
+        case 0xfe:
+        case 0xff: {
+            uint8_t ret = spc.memory.timers[addr - 0xfd].counter;
+            spc.memory.timers[addr - 0xfd].counter = 0;
+            return ret;
+        }
         default:
             UNREACHABLE_SWITCH(addr);
         }
@@ -32,7 +45,45 @@ uint8_t spc_mmu_read(uint16_t addr, bool log) {
 }
 
 void spc_mmu_write(uint16_t addr, uint8_t val, bool log) {
+    (void)log;
     spc.memory.ram[addr] = val;
-    if(addr >= 0xf4 && addr < 0xf8)
-    if(log)log_message(LOG_LEVEL_INFO, "SPC: wrote 0x%02x to port %d of APU bus", val, addr - 0xf4 + 1);
+    if (addr >= 0xf0 && addr < 0x100) {
+        switch (addr) {
+        case 0xf1:
+            spc.enable_ipl = val & 0x80;
+            spc.memory.timers[2].enable = val & 0x4;
+            spc.memory.timers[1].enable = val & 0x2;
+            spc.memory.timers[0].enable = val & 0x1;
+            if (val & 0x20) {
+                spc.memory.ram[0xf7] = 0;
+                spc.memory.ram[0xf6] = 0;
+            }
+            if (val & 0x10) {
+                spc.memory.ram[0xf5] = 0;
+                spc.memory.ram[0xf4] = 0;
+            }
+            break;
+        case 0xf2:
+        case 0xf3:
+            if (log)
+                log_message(LOG_LEVEL_INFO, "Write of 0x%02x to DSP %s", val,
+                            addr == 0xf2 ? "addr" : "data");
+            break;
+        case 0xf4:
+        case 0xf5:
+        case 0xf6:
+        case 0xf7:
+            if (log)
+                log_message(LOG_LEVEL_VERBOSE, "Write of 0x%02x to CPU port %d",
+                            val, addr - 0xf4 + 1);
+            break;
+        case 0xfa:
+        case 0xfb:
+        case 0xfc:
+            spc.memory.timers[addr - 0xfa].timer = val;
+            break;
+        default:
+            UNREACHABLE_SWITCH(addr);
+        }
+    }
 }

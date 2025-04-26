@@ -95,6 +95,13 @@ OP(tya) {
     spc_set_status_bit(STATUS_NEGATIVE, spc.a & 0x80);
 }
 
+OP(tay) {
+    LEGALADDRMODES(SM_IMP);
+    spc.y = spc.a;
+    spc_set_status_bit(STATUS_ZERO, spc.y == 0);
+    spc_set_status_bit(STATUS_NEGATIVE, spc.y & 0x80);
+}
+
 OP(inx) {
     LEGALADDRMODES(SM_IMP);
     spc.x++;
@@ -128,6 +135,15 @@ OP(bra) {
     spc.pc += (int8_t)spc_next_8();
 }
 
+OP(beq) {
+    LEGALADDRMODES(SM_REL);
+    if (spc_get_status_bit(STATUS_ZERO)) {
+        spc.pc += (int8_t)spc_next_8();
+    } else {
+        spc.pc++;
+    }
+}
+
 OP(bne) {
     LEGALADDRMODES(SM_REL);
     if (!spc_get_status_bit(STATUS_ZERO)) {
@@ -149,6 +165,17 @@ OP(bpl) {
 OP(jmp) {
     LEGALADDRMODES(SM_ABS | SM_ABS_INDX);
     spc.pc = spc_resolve_addr(mode);
+}
+
+OP(jsr) {
+    LEGALADDRMODES(SM_ABS);
+    spc_push_16(spc.pc - 1 + 2);
+    spc.pc = spc_resolve_addr(mode);
+}
+
+OP(rts) {
+    LEGALADDRMODES(SM_IMP);
+    spc.pc = spc_pop_16() + 1;
 }
 
 OP(mov) {
@@ -196,6 +223,15 @@ OP(cmp) {
     spc_set_status_bit(STATUS_CARRY, op1 >= op2);
 }
 
+OP(cpx) {
+    LEGALADDRMODES(SM_IMM | SM_ABS | SM_DIR_PAGE);
+    uint8_t op1 = spc.x;
+    uint8_t op2 = spc_resolve_read(mode);
+    spc_set_status_bit(STATUS_NEGATIVE, (op1 - op2) & 0x80);
+    spc_set_status_bit(STATUS_ZERO, op1 == op2);
+    spc_set_status_bit(STATUS_CARRY, op1 >= op2);
+}
+
 OP(cpy) {
     LEGALADDRMODES(SM_IMM | SM_ABS | SM_DIR_PAGE);
     uint8_t op1 = spc.y;
@@ -218,4 +254,48 @@ OP(inc) {
         spc_set_status_bit(STATUS_NEGATIVE, val & 0x80);
         spc_set_status_bit(STATUS_ZERO, val == 0);
     }
+}
+
+OP(adc) {
+    LEGALADDRMODES(SM_DIR_PAGE | SM_DIR_PAGEX | SM_ABS | SM_ABSX | SM_ABSY |
+                   SM_INDIRECT | SM_INDX | SM_INDY | SM_IMM |
+                   SM_IMM_TO_DIR_PAGE | SM_DIR_PAGE_TO_DIR_PAGE |
+                   SM_IND_PAGE_TO_IND_PAGE);
+    uint8_t op1, op2;
+    uint16_t dest;
+    if (mode == SM_IMM_TO_DIR_PAGE) {
+        op1 = spc_next_8();
+        dest = spc_next_8() + spc_get_status_bit(STATUS_DIRECTPAGE) * 0x100;
+        op2 = spc_read_8(dest);
+    } else if (mode == SM_DIR_PAGE_TO_DIR_PAGE) {
+        op1 = spc_read_8(spc_next_8() +
+                         spc_get_status_bit(STATUS_DIRECTPAGE) * 0x100);
+        dest = spc_next_8() + spc_get_status_bit(STATUS_DIRECTPAGE) * 0x100;
+        op2 = spc_read_8(dest);
+    } else if (mode == SM_IND_PAGE_TO_IND_PAGE) {
+        op1 = spc_read_8(spc.x);
+        op2 = spc_read_8(spc.y);
+        dest = spc.x;
+        TODO("check if indirect access is susceptible to direct page bit");
+    } else {
+        op1 = spc.a;
+        op2 = spc_resolve_read(mode);
+    }
+    uint16_t result = op1 + op2 + spc_get_status_bit(STATUS_CARRY);
+    spc_set_status_bit(STATUS_CARRY, result > 0xff);
+    spc_set_status_bit(STATUS_ZERO, (result & 0xff) == 0);
+    spc_set_status_bit(STATUS_HALFCARRY, (result ^ op1 ^ op2) & 0x10);
+    spc_set_status_bit(STATUS_OVERFLOW, (op1 ^ op2) & (op1 ^ result) & 0x80);
+    spc_set_status_bit(STATUS_NEGATIVE, result & 0x80);
+    if (mode == SM_IMM_TO_DIR_PAGE || mode == SM_DIR_PAGE_TO_DIR_PAGE ||
+        mode == SM_IND_PAGE_TO_IND_PAGE) {
+        spc_write_8(dest, result);
+    } else {
+        spc.a = result;
+    }
+}
+
+OP(clp) {
+    LEGALADDRMODES(SM_IMP);
+    spc_set_status_bit(STATUS_DIRECTPAGE, false);
 }

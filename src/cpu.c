@@ -31,9 +31,13 @@ uint16_t read_r(r_t reg) {
     }
 }
 
-uint8_t read_8(uint16_t addr, uint8_t bank) { return mmu_read(addr, bank, true); }
+uint8_t read_8(uint16_t addr, uint8_t bank) {
+    return mmu_read(addr, bank, true);
+}
 
-uint8_t read_8_no_log(uint16_t addr, uint8_t bank) { return mmu_read(addr, bank, false); }
+uint8_t read_8_no_log(uint16_t addr, uint8_t bank) {
+    return mmu_read(addr, bank, false);
+}
 
 uint16_t read_16(uint16_t addr, uint8_t bank) {
     return TO_U16(read_8(addr, bank), read_8(addr + 1, bank));
@@ -182,7 +186,6 @@ uint32_t resolve_addr(addressing_mode_t mode) {
         break;
     case AM_INDY_DIR_L:
         ret = read_24(next_8() + read_r(R_D), 0) + read_r(R_Y);
-        printf("0x%06x\n", ret);
         break;
     case AM_IND_DIR_L:
         ret = read_24(next_8() + read_r(R_D), 0);
@@ -337,6 +340,9 @@ void cpu_execute(void) {
         break;
     case 0x70:
         bvs(AM_PC_REL);
+        break;
+    case 0x74:
+        stz(AM_ZBKX_DIR);
         break;
     case 0x78:
         sei(AM_IMP);

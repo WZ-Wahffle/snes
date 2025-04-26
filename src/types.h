@@ -172,6 +172,12 @@ typedef struct {
 
 typedef struct {
     uint8_t ram[0x10000];
+    struct spc_timer_t {
+        bool enable;
+        uint8_t timer;
+        uint8_t counter;
+        uint8_t timer_internal;
+    } timers[3];
 } spc_mmu_t;
 
 typedef struct {
@@ -181,6 +187,7 @@ typedef struct {
     double remaining_clocks;
     bool breakpoint_valid;
     uint16_t breakpoint;
+    bool enable_ipl;
 } spc_t;
 
 typedef struct {
@@ -228,6 +235,11 @@ EXTERNC uint16_t spc_read_16(uint16_t addr);
 EXTERNC uint8_t spc_next_8(void);
 EXTERNC void spc_write_8(uint16_t addr, uint8_t val);
 EXTERNC void spc_write_16(uint16_t addr, uint16_t val);
+EXTERNC void spc_push_8(uint8_t val);
+EXTERNC void spc_push_16(uint16_t val);
+EXTERNC uint8_t spc_pop_8(void);
+EXTERNC uint16_t spc_pop_16(void);
+
 
 
 static void log_message(log_level_t level, char *message, ...) {
