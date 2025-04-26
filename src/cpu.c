@@ -7,18 +7,18 @@ extern spc_t spc;
 uint16_t read_r(r_t reg) {
     switch (reg) {
     case R_C:
-        if (get_status_bit(STATUS_MEMNARROW)) {
-            cpu.c = U16_LOBYTE(cpu.c);
+        if (cpu.emulation_mode || get_status_bit(STATUS_MEMNARROW)) {
+            return U16_LOBYTE(cpu.c);
         }
         return cpu.c;
     case R_X:
-        if (get_status_bit(STATUS_XNARROW)) {
-            cpu.x = U16_LOBYTE(cpu.x);
+        if (cpu.emulation_mode || get_status_bit(STATUS_XNARROW)) {
+            return U16_LOBYTE(cpu.x);
         }
         return cpu.x;
     case R_Y:
-        if (get_status_bit(STATUS_XNARROW)) {
-            cpu.y = U16_LOBYTE(cpu.y);
+        if (cpu.emulation_mode || get_status_bit(STATUS_XNARROW)) {
+            return U16_LOBYTE(cpu.y);
         }
         return cpu.y;
     case R_S:
@@ -31,7 +31,9 @@ uint16_t read_r(r_t reg) {
     }
 }
 
-uint8_t read_8(uint16_t addr, uint8_t bank) { return mmu_read(addr, bank); }
+uint8_t read_8(uint16_t addr, uint8_t bank) { return mmu_read(addr, bank, true); }
+
+uint8_t read_8_no_log(uint16_t addr, uint8_t bank) { return mmu_read(addr, bank, false); }
 
 uint16_t read_16(uint16_t addr, uint8_t bank) {
     return TO_U16(read_8(addr, bank), read_8(addr + 1, bank));
@@ -80,7 +82,7 @@ void write_r(r_t reg, uint16_t val) {
 }
 
 void write_8(uint16_t addr, uint8_t bank, uint8_t val) {
-    mmu_write(addr, bank, val);
+    mmu_write(addr, bank, val, true);
 }
 
 void write_16(uint16_t addr, uint8_t bank, uint16_t val) {
@@ -145,8 +147,8 @@ uint32_t resolve_addr(addressing_mode_t mode) {
         ret = TO_U24(next_16(), cpu.dbr);
         break;
     case AM_INDX:
-        // only to be used with JMP instructions, must be dereferenced for the
-        // actual value
+        // only to be used with JMP instructions, must be
+        // dereferenced for the actual value
         ret = TO_U24(next_16() + read_r(R_X), cpu.pbr);
         break;
     case AM_ABSX:
@@ -156,8 +158,8 @@ uint32_t resolve_addr(addressing_mode_t mode) {
         ret = TO_U24(next_16() + read_r(R_Y), cpu.dbr);
         break;
     case AM_IND:
-        // only to be used with JMP instructions, must be dereferenced for the
-        // actual value
+        // only to be used with JMP instructions, must be
+        // dereferenced for the actual value
         ret = next_16();
         break;
     case AM_ABSX_L:
@@ -180,6 +182,7 @@ uint32_t resolve_addr(addressing_mode_t mode) {
         break;
     case AM_INDY_DIR_L:
         ret = read_24(next_8() + read_r(R_D), 0) + read_r(R_Y);
+        printf("0x%06x\n", ret);
         break;
     case AM_IND_DIR_L:
         ret = read_24(next_8() + read_r(R_D), 0);
@@ -282,8 +285,9 @@ void cpu_execute(void) {
     // TODO: disambiguate cpu cycles taking 6, 8 or 12 clock cycles
 
     // remaining clocks increments at 341 * 262 * 60 * 4 = 21.44MHz.
-    // The highest achievable CPU clock speed is roughly 3.58 MHz, which
-    // corresponds to 6 master clocks per CPU clock, hence the factor of 6
+    // The highest achievable CPU clock speed is roughly 3.58 MHz,
+    // which corresponds to 6 master clocks per CPU clock, hence the
+    // factor of 6
     cpu.remaining_clocks -= 6 * cpu_cycle_counts[opcode];
     switch (opcode) {
     case 0x08:

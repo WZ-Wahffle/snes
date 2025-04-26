@@ -12,7 +12,8 @@ uint8_t ipl_boot_rom[] = {
     0xf4, 0x10, 0xeb, 0xba, 0xf6, 0xda, 0x00, 0xba, 0xf4, 0xc4, 0xf4,
     0xdd, 0x5d, 0xd0, 0xdb, 0x1f, 0x00, 0x00, 0xc0, 0xff};
 
-uint8_t spc_mmu_read(uint16_t addr) {
+uint8_t spc_mmu_read(uint16_t addr, bool log) {
+    (void)log;
     if (addr >= 0xffc0) {
         return ipl_boot_rom[addr - 0xffc0];
     } else if (addr >= 0xf0 && addr < 0x100) {
@@ -30,4 +31,8 @@ uint8_t spc_mmu_read(uint16_t addr) {
     return spc.memory.ram[addr];
 }
 
-void spc_mmu_write(uint16_t addr, uint8_t val) { spc.memory.ram[addr] = val; }
+void spc_mmu_write(uint16_t addr, uint8_t val, bool log) {
+    spc.memory.ram[addr] = val;
+    if(addr >= 0xf4 && addr < 0xf8)
+    if(log)log_message(LOG_LEVEL_INFO, "SPC: wrote 0x%02x to port %d of APU bus", val, addr - 0xf4 + 1);
+}

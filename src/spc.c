@@ -5,7 +5,9 @@
 extern cpu_t cpu;
 extern spc_t spc;
 
-uint8_t spc_read_8(uint16_t addr) { return spc_mmu_read(addr); }
+uint8_t spc_read_8(uint16_t addr) { return spc_mmu_read(addr, true); }
+
+uint8_t spc_read_8_no_log(uint16_t addr) { return spc_mmu_read(addr, false); }
 
 uint16_t spc_read_16(uint16_t addr) {
     uint8_t lsb = spc_read_8(addr);
@@ -19,7 +21,7 @@ uint16_t spc_next_16(void) {
     return TO_U16(lsb, spc_next_8());
 }
 
-void spc_write_8(uint16_t addr, uint8_t val) { spc_mmu_write(addr, val); }
+void spc_write_8(uint16_t addr, uint8_t val) { spc_mmu_write(addr, val, true); }
 
 void spc_write_16(uint16_t addr, uint16_t val) {
     spc_write_8(addr, U16_LOBYTE(val));

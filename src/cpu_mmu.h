@@ -4,7 +4,7 @@
 #include "types.h"
 
 void mmu_init(memory_map_mode_t mode);
-uint8_t mmu_read(uint16_t addr, uint8_t bank);
-void mmu_write(uint16_t addr, uint8_t bank, uint8_t value);
+uint8_t mmu_read(uint16_t addr, uint8_t bank, bool log);
+void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log);
 
 #endif

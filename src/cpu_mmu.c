@@ -5,70 +5,76 @@ extern ppu_t ppu;
 extern spc_t spc;
 
 // https://snes.nesdev.org/wiki/Memory_map#LoROM
-static uint32_t lo_rom_resolve(uint32_t addr) {
+uint32_t lo_rom_resolve(uint32_t addr, bool log) {
     uint32_t ret = addr & 0x7fff;
     ret |= (addr >> 1) & 0b1111111000000000000000;
     ASSERT(ret < cpu.memory.rom_size,
            "ROM index 0x%06x larger than size 0x%06x", ret,
            cpu.memory.rom_size);
-    log_message(LOG_LEVEL_VERBOSE, "Resolved LoROM address 0x%06x to 0x%06x",
-                addr, ret);
+    if (log)
+        log_message(LOG_LEVEL_VERBOSE,
+                    "Resolved LoROM address 0x%06x to 0x%06x", addr, ret);
     return ret;
 }
 
 // https://snes.nesdev.org/wiki/Memory_map#HiROM
-static uint32_t hi_rom_resolve(uint32_t addr) {
+uint32_t hi_rom_resolve(uint32_t addr, bool log) {
     uint32_t ret = addr & 0x3fffff;
     ASSERT(ret < cpu.memory.rom_size,
            "ROM index 0x%06x larger than size 0x%06x", ret,
            cpu.memory.rom_size);
-    log_message(LOG_LEVEL_VERBOSE, "Resolved HiROM address 0x%06x to 0x%06x",
-                addr, ret);
+    if (log)
+        log_message(LOG_LEVEL_VERBOSE,
+                    "Resolved HiROM address 0x%06x to 0x%06x", addr, ret);
     return ret;
 }
 
 // https://snes.nesdev.org/wiki/Memory_map#ExHiROM
-static uint32_t ex_hi_rom_resolve(uint32_t addr) {
+uint32_t ex_hi_rom_resolve(uint32_t addr, bool log) {
     uint32_t ret = addr & 0x3fffff;
     ret |= ((~addr) >> 1) & 0x400000;
     ASSERT(ret < cpu.memory.rom_size,
            "ROM index 0x%06x larger than size 0x%06x", ret,
            cpu.memory.rom_size);
-    log_message(LOG_LEVEL_VERBOSE, "Resolved ExHiROM address 0x%06x to 0x%06x",
-                addr, ret);
+    if (log)
+        log_message(LOG_LEVEL_VERBOSE,
+                    "Resolved ExHiROM address 0x%06x to 0x%06x", addr, ret);
     return ret;
 }
 
-uint8_t mmu_read(uint16_t addr, uint8_t bank) {
+uint8_t mmu_read(uint16_t addr, uint8_t bank, bool log) {
     // ROM resolution
     uint8_t ret;
     switch (cpu.memory.mode) {
     case LOROM:
         if ((bank <= 0x7d || bank >= 0x80) && addr >= 0x8000) {
-            ret = cpu.memory.rom[lo_rom_resolve(addr)];
-            log_message(LOG_LEVEL_VERBOSE,
-                        "Read 0x%02x from ROM address 0x%04x, bank 0x%02x", ret,
-                        addr, bank);
+            ret = cpu.memory.rom[lo_rom_resolve(TO_U24(addr, bank), log)];
+            if (log)
+                log_message(LOG_LEVEL_VERBOSE,
+                            "Read 0x%02x from ROM address 0x%04x, bank 0x%02x",
+                            ret, addr, bank);
             return ret;
         }
         break;
     case HIROM:
         if ((bank < 0x40 && addr >= 0x8000) ||
             (bank >= 0x80 && bank < 0xc0 && addr >= 0x8000) || bank >= 0xc0) {
-            ret = cpu.memory.rom[hi_rom_resolve(addr)];
-            log_message(LOG_LEVEL_VERBOSE,
-                        "Read 0x%02x from ROM address 0x%04x, bank 0x%02x", ret,
-                        addr, bank);
+            ret = cpu.memory.rom[hi_rom_resolve(TO_U24(addr, bank), log)];
+            if (log)
+                log_message(LOG_LEVEL_VERBOSE,
+                            "Read 0x%02x from ROM address 0x%04x, bank 0x%02x",
+                            ret, addr, bank);
             return ret;
         }
         break;
     case EXHIROM:
         if ((bank < 0x40 && addr >= 0x8000) || (bank >= 0x40 && bank < 0x7d) ||
             (bank >= 0x80 && bank < 0xc0 && addr >= 0x8000) || (bank >= 0xc0)) {
-            ret = cpu.memory.rom[ex_hi_rom_resolve(addr)];
-            log_message(LOG_LEVEL_VERBOSE,
-                        "Read 0x%02x from ROM address 0x%04x, bank 0x%02x", ret,
-                        addr, bank);
+            ret = cpu.memory.rom[ex_hi_rom_resolve(TO_U24(addr, bank), log)];
+            if (log)
+                log_message(LOG_LEVEL_VERBOSE,
+                            "Read 0x%02x from ROM address 0x%04x, bank 0x%02x",
+                            ret, addr, bank);
             return ret;
         }
         break;
@@ -96,7 +102,7 @@ uint8_t mmu_read(uint16_t addr, uint8_t bank) {
     ASSERT(0, "Tried to read from bank 0x%02x, address 0x%04x", bank, addr);
 }
 
-void mmu_write(uint16_t addr, uint8_t bank, uint8_t value) {
+void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
     if ((bank < 0x40 || (bank >= 0x80 && bank < 0xc0)) && addr < 0x8000) {
         if (addr < 0x2000) {
             cpu.memory.ram[addr] = value;
@@ -110,6 +116,10 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value) {
             case 0x2141:
             case 0x2142:
             case 0x2143:
+                if (log)
+                    log_message(LOG_LEVEL_INFO,
+                                "CPU: wrote 0x%02x to port %d of APU bus",
+                                value, addr - 0x2140 + 1);
                 cpu.memory.apu_io[addr - 0x2140] = value;
                 break;
             case 0x4200:

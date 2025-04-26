@@ -1,3 +1,4 @@
 CompileFlags:
     Add:
         - "-I./include/"
+    Remove: [-Wwrite-strings]

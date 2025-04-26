@@ -3,7 +3,7 @@
 
 #include "types.h"
 
-uint8_t spc_mmu_read(uint16_t addr);
-void spc_mmu_write(uint16_t addr, uint8_t val);
+uint8_t spc_mmu_read(uint16_t addr, bool log);
+void spc_mmu_write(uint16_t addr, uint8_t val, bool log);
 
 #endif

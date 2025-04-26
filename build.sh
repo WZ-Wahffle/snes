@@ -2,7 +2,7 @@
 
 function build() {
     mkdir -p out
-    g++ -c -o src/ui.o src/ui.cpp -Isrc/include/ -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-parameter
+    g++ -c -o src/ui.o src/ui.cpp -Isrc/include/ -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-parameter -Wno-write-strings
 	gcc -g -o out/snes src/*.c src/*.o -Isrc/include/ -Lsrc/lib/ -l:libraylib.a -l:libSDL2.a -lm -lrlImGui -limgui -Wall -Wextra -Werror -lstdc++ -DLOG_LEVEL=1 -Wno-unused-function
 }
 

@@ -195,6 +195,7 @@ typedef struct {
 #else
 #define EXTERNC
 #endif
+EXTERNC uint32_t lo_rom_resolve(uint32_t addr, bool log);
 EXTERNC void set_status_bit(status_bit_t bit, bool value);
 EXTERNC bool get_status_bit(status_bit_t bit);
 EXTERNC void spc_set_status_bit(status_bit_t bit, bool value);
@@ -208,6 +209,7 @@ EXTERNC uint8_t spc_resolve_read(spc_addressing_mode_t mode);
 EXTERNC void spc_resolve_write(spc_addressing_mode_t mode, uint8_t val);
 
 EXTERNC uint8_t read_8(uint16_t addr, uint8_t bank);
+EXTERNC uint8_t read_8_no_log(uint16_t addr, uint8_t bank);
 EXTERNC uint16_t read_16(uint16_t addr, uint8_t bank);
 EXTERNC uint32_t read_24(uint16_t addr, uint8_t bank);
 EXTERNC uint16_t read_r(r_t reg);
@@ -221,6 +223,7 @@ EXTERNC uint8_t pop_8(void);
 EXTERNC uint16_t pop_16(void);
 EXTERNC uint32_t pop_24(void);
 EXTERNC uint8_t spc_read_8(uint16_t addr);
+EXTERNC uint8_t spc_read_8_no_log(uint16_t addr);
 EXTERNC uint16_t spc_read_16(uint16_t addr);
 EXTERNC uint8_t spc_next_8(void);
 EXTERNC void spc_write_8(uint16_t addr, uint8_t val);

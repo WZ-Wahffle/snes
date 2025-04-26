@@ -11,7 +11,7 @@ extern spc_t spc;
 char bp_inter[7] = {0};
 void cpu_window(void) {
     ImGui::Begin("cpu", NULL);
-    ImGui::Text("PC: 0x%04x Opcode: 0x%02x", cpu.pc, read_8(cpu.pc, cpu.pbr));
+    ImGui::Text("PC: 0x%04x Opcode: 0x%02x", cpu.pc, read_8_no_log(cpu.pc, cpu.pbr));
     if (ImGui::Button("Start"))
         cpu.state = STATE_RUNNING;
     ImGui::SameLine();
@@ -65,7 +65,7 @@ void cpu_window(void) {
 char spc_bp_inter[5] = {0};
 void spc_window(void) {
     ImGui::Begin("spc", NULL);
-    ImGui::Text("PC: 0x%04x Opcode: 0x%02x", spc.pc, spc_read_8(spc.pc));
+    ImGui::Text("PC: 0x%04x Opcode: 0x%02x", spc.pc, spc_read_8_no_log(spc.pc));
     ImGui::Text("A: 0x%02x", spc.a);
     ImGui::Text("X: 0x%02x", spc.x);
     ImGui::Text("Y: 0x%02x", spc.y);
@@ -92,22 +92,112 @@ void spc_window(void) {
     ImGui::End();
 }
 
-int32_t spc_page = 0;
+int32_t spc_ram_page = 0;
 void spc_ram_window(void) {
     ImGui::Begin("spc ram");
-    ImGui::InputInt("Page", &spc_page);
-    if(spc_page < 0) spc_page = 0;
-    if(spc_page > 0xff) spc_page = 0xff;
-    if(ImGui::BeginTable("##spcram", 16, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
-        for(uint16_t i = 0; i < 16; i++) {
-            for(uint8_t j = 0; j < 16; j++) {
+    ImGui::InputInt("Page", &spc_ram_page, 0, 0, ImGuiInputTextFlags_CharsHexadecimal);
+    if (spc_ram_page < 0)
+        spc_ram_page = 0;
+    if (spc_ram_page > 0xff)
+        spc_ram_page = 0xff;
+    if (ImGui::BeginTable("##spcram", 16,
+                          ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
+        for (uint16_t i = 0; i < 16; i++) {
+            for (uint8_t j = 0; j < 16; j++) {
                 ImGui::TableNextColumn();
-                ImGui::Text("%02x", spc.memory.ram[spc_page * 0x100 + i * 16 + j]);
-                if(ImGui::IsItemHovered()) {
-                    ImGui::SetTooltip("0x%04x", spc_page * 0x100 + i * 16 + j);
+                ImGui::Text("%02x",
+                            spc.memory.ram[spc_ram_page * 0x100 + i * 16 + j]);
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("0x%04x",
+                                      spc_ram_page * 0x100 + i * 16 + j);
                 }
             }
-            if(i != 15) ImGui::TableNextRow();
+            if (i != 15)
+                ImGui::TableNextRow();
+        }
+        ImGui::EndTable();
+    }
+    ImGui::End();
+}
+
+int cpu_ram_bank = 0;
+int cpu_ram_page = 0;
+void cpu_ram_window(void) {
+    ImGui::Begin("cpu ram");
+    ImGui::InputInt("Bank", &cpu_ram_bank, 0, 0, ImGuiInputTextFlags_CharsHexadecimal);
+    ImGui::SameLine();
+    ImGui::InputInt("Page", &cpu_ram_page, 0, 0, ImGuiInputTextFlags_CharsHexadecimal);
+    if (cpu_ram_page < 0)
+        cpu_ram_page = 0;
+    if (cpu_ram_page > 0xff) {
+        cpu_ram_page = 0;
+        cpu_ram_bank++;
+    }
+    if (cpu_ram_bank < 0)
+        cpu_ram_bank = 0;
+    if (cpu_ram_bank > 1)
+        cpu_ram_bank = 1;
+    if (ImGui::BeginTable("##cpuram", 16,
+                          ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
+        for (uint16_t i = 0; i < 16; i++) {
+            for (uint8_t j = 0; j < 16; j++) {
+                ImGui::TableNextColumn();
+                ImGui::Text("%02x",
+                            cpu.memory.ram[cpu_ram_bank * 0x10000 +
+                                           cpu_ram_page * 0x100 + i * 16 + j]);
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("0x%06x", cpu_ram_bank * 0x10000 +
+                                                    cpu_ram_page * 0x100 +
+                                                    i * 16 + j);
+                }
+            }
+            if (i != 15)
+                ImGui::TableNextRow();
+        }
+        ImGui::EndTable();
+    }
+    ImGui::End();
+}
+
+int cpu_rom_bank = 0;
+int cpu_rom_page = 0;
+void cpu_rom_window(void) {
+    ImGui::Begin("cpu rom");
+    ImGui::InputInt("Bank", &cpu_rom_bank, 0, 0, ImGuiInputTextFlags_CharsHexadecimal);
+    ImGui::SameLine();
+    ImGui::InputInt("Page", &cpu_rom_page, 0, 0, ImGuiInputTextFlags_CharsHexadecimal);
+    if (cpu_rom_page < 0x80)
+        cpu_rom_page = 0x80;
+    if (cpu_rom_page > 0xff) {
+        cpu_rom_page = 0xff;
+        cpu_rom_bank++;
+    }
+    if (cpu_rom_bank == 0x7e)
+        cpu_rom_bank = 0x80;
+    if (cpu_rom_bank == 0x7f)
+        cpu_rom_bank = 0x7d;
+    if (cpu_rom_bank < 0)
+        cpu_rom_bank = 0;
+    if (cpu_rom_bank > 0xff)
+        cpu_rom_bank = 0xff;
+    if (ImGui::BeginTable("##cpurom", 16,
+                          ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
+        if (cpu.memory.mode != LOROM)
+            TODO("other modes");
+        for (uint16_t i = 0; i < 16; i++) {
+            for (uint8_t j = 0; j < 16; j++) {
+                ImGui::TableNextColumn();
+                ImGui::Text("%02x", cpu.memory.rom[lo_rom_resolve(
+                                        cpu_rom_bank * 0x10000 +
+                                        cpu_rom_page * 0x100 + i * 16 + j, false)]);
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("0x%06x", cpu_rom_bank * 0x10000 +
+                                                    cpu_rom_page * 0x100 +
+                                                    i * 16 + j);
+                }
+            }
+            if (i != 15)
+                ImGui::TableNextRow();
         }
         ImGui::EndTable();
     }
@@ -125,6 +215,8 @@ void cpp_imgui_render(void) {
     rlImGuiBegin();
     spc_window();
     spc_ram_window();
+    cpu_ram_window();
+    cpu_rom_window();
     cpu_window();
     rlImGuiEnd();
 }
