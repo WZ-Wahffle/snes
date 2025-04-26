@@ -89,6 +89,18 @@ void spc_window(void) {
     } else {
         spc.breakpoint = strtoul(spc_bp_inter, NULL, 16);
     }
+    ImGui::Text("Timer 0 enable: %s", spc.memory.timers[0].enable ? "true" : "false");
+    ImGui::Text("Timer 0 timer: %d", spc.memory.timers[0].timer_internal);
+    ImGui::Text("Timer 0 modulo: %d", spc.memory.timers[0].timer);
+    ImGui::Text("Timer 0 counter: %d", spc.memory.timers[0].counter);
+    ImGui::Text("Timer 1 enable: %s", spc.memory.timers[1].enable ? "true" : "false");
+    ImGui::Text("Timer 1 timer: %d", spc.memory.timers[1].timer_internal);
+    ImGui::Text("Timer 1 modulo: %d", spc.memory.timers[1].timer);
+    ImGui::Text("Timer 1 counter: %d", spc.memory.timers[1].counter);
+    ImGui::Text("Timer 2 enable: %s", spc.memory.timers[2].enable ? "true" : "false");
+    ImGui::Text("Timer 2 timer: %d", spc.memory.timers[2].timer_internal);
+    ImGui::Text("Timer 2 modulo: %d", spc.memory.timers[2].timer);
+    ImGui::Text("Timer 2 counter: %d", spc.memory.timers[2].counter);
     ImGui::End();
 }
 

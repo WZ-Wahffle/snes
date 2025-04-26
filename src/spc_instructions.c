@@ -66,6 +66,11 @@ OP(sta) {
     spc_resolve_write(mode, spc.a);
 }
 
+OP(stx) {
+    LEGALADDRMODES(SM_ABS | SM_DIR_PAGE | SM_DIR_PAGEY);
+    spc_resolve_write(mode, spc.x);
+}
+
 OP(sty) {
     LEGALADDRMODES(SM_ABS | SM_DIR_PAGE | SM_DIR_PAGEX);
     spc_resolve_write(mode, spc.y);
@@ -79,6 +84,13 @@ OP(stw) {
 OP(txs) {
     LEGALADDRMODES(SM_IMP);
     spc.s = spc.x;
+}
+
+OP(txa) {
+    LEGALADDRMODES(SM_IMP);
+    spc.a = spc.x;
+    spc_set_status_bit(STATUS_ZERO, spc.a == 0);
+    spc_set_status_bit(STATUS_NEGATIVE, spc.a & 0x80);
 }
 
 OP(tax) {
@@ -153,9 +165,37 @@ OP(bne) {
     }
 }
 
+OP(bmi) {
+    LEGALADDRMODES(SM_REL);
+    if (spc_get_status_bit(STATUS_NEGATIVE)) {
+        spc.pc += (int8_t)spc_next_8();
+    } else {
+        spc.pc++;
+    }
+}
+
 OP(bpl) {
     LEGALADDRMODES(SM_REL);
     if (!spc_get_status_bit(STATUS_NEGATIVE)) {
+        spc.pc += (int8_t)spc_next_8();
+    } else {
+        spc.pc++;
+    }
+}
+
+OP(bcc) {
+    LEGALADDRMODES(SM_REL);
+    if (!spc_get_status_bit(STATUS_CARRY)) {
+        spc.pc += (int8_t)spc_next_8();
+    } else {
+        spc.pc++;
+    }
+}
+
+OP(cbne) {
+    LEGALADDRMODES(SM_DIR_PAGE | SM_DIR_PAGEX);
+    uint8_t operand = spc_resolve_read(mode);
+    if (spc.a != operand) {
         spc.pc += (int8_t)spc_next_8();
     } else {
         spc.pc++;
@@ -176,6 +216,16 @@ OP(jsr) {
 OP(rts) {
     LEGALADDRMODES(SM_IMP);
     spc.pc = spc_pop_16() + 1;
+}
+
+OP(phy) {
+    LEGALADDRMODES(SM_IMP);
+    spc_push_8(spc.y);
+}
+
+OP(ply) {
+    LEGALADDRMODES(SM_IMP);
+    spc.y = spc_pop_8();
 }
 
 OP(mov) {
@@ -295,7 +345,33 @@ OP(adc) {
     }
 }
 
+OP(mul) {
+    LEGALADDRMODES(SM_IMP);
+    uint16_t result = spc.a * spc.y;
+    spc.a = U16_LOBYTE(result);
+    spc.y = U16_LOBYTE(result);
+    spc_set_status_bit(STATUS_ZERO, spc.y == 0);
+    spc_set_status_bit(STATUS_NEGATIVE, spc.y & 0x80);
+}
+
+OP(div) {
+    LEGALADDRMODES(SM_IMP);
+    uint8_t result1 = TO_U16(spc.a, spc.y) / spc.x;
+    uint8_t result2 = TO_U16(spc.a, spc.y) % spc.x;
+    spc_set_status_bit(STATUS_OVERFLOW, spc.y >= spc.x);
+    spc_set_status_bit(STATUS_HALFCARRY, (spc.y & 0xf) >= (spc.x & 0xf));
+    spc.a = result1;
+    spc.y = result2;
+    spc_set_status_bit(STATUS_ZERO, spc.a == 0);
+    spc_set_status_bit(STATUS_NEGATIVE, spc.a & 0x80);
+}
+
 OP(clp) {
     LEGALADDRMODES(SM_IMP);
     spc_set_status_bit(STATUS_DIRECTPAGE, false);
+}
+
+OP(clc) {
+    LEGALADDRMODES(SM_IMP);
+    spc_set_status_bit(STATUS_CARRY, false);
 }

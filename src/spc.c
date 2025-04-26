@@ -154,7 +154,7 @@ static uint8_t spc_cycle_counts[] = {
 };
 
 void spc_execute(void) {
-    static uint32_t timer_timer = 0;
+    static uint8_t timer_timer = 0, fast_timer_timer = 0;
     uint8_t opcode = spc_next_8();
     log_message(LOG_LEVEL_VERBOSE, "SPC fetched opcode 0x%02x", opcode);
     // The SPC700 technically resides on its own clock, but this would make
@@ -162,7 +162,8 @@ void spc_execute(void) {
     // multiplied by 21 which is roughly accurate to the lower clock frequency
     spc.remaining_clocks -= 21 * spc_cycle_counts[opcode];
     timer_timer += spc_cycle_counts[opcode];
-    if (timer_timer % 16 == 0) {
+    fast_timer_timer += spc_cycle_counts[opcode];
+    if (fast_timer_timer >= 16) {
         if (spc.memory.timers[2].enable) {
             spc.memory.timers[2].timer_internal++;
             if (spc.memory.timers[2].timer_internal ==
@@ -172,8 +173,9 @@ void spc_execute(void) {
                 spc.memory.timers[2].timer_internal = 0;
             }
         }
+        fast_timer_timer -= 16;
     }
-    if (timer_timer % 128 == 0) {
+    if (timer_timer >= 128) {
         if (spc.memory.timers[0].enable) {
             spc.memory.timers[0].timer_internal++;
             if (spc.memory.timers[0].timer_internal ==
@@ -192,6 +194,7 @@ void spc_execute(void) {
                 spc.memory.timers[1].timer_internal = 0;
             }
         }
+        timer_timer -= 128;
     }
     switch (opcode) {
     case 0x10:
@@ -209,6 +212,9 @@ void spc_execute(void) {
     case 0x2f:
         spc_bra(SM_REL);
         break;
+    case 0x30:
+        spc_bmi(SM_REL);
+        break;
     case 0x3d:
         spc_inx(SM_IMP);
         break;
@@ -218,20 +224,50 @@ void spc_execute(void) {
     case 0x5d:
         spc_tax(SM_IMP);
         break;
+    case 0x5e:
+        spc_cpy(SM_ABS);
+        break;
+    case 0x60:
+        spc_clc(SM_IMP);
+        break;
+    case 0x68:
+        spc_cmp(SM_IMM);
+        break;
+    case 0x6d:
+        spc_phy(SM_IMP);
+        break;
     case 0x6f:
         spc_rts(SM_IMP);
+        break;
+    case 0x75:
+        spc_cmp(SM_ABSX);
         break;
     case 0x78:
         spc_cmp(SM_IMM_TO_DIR_PAGE);
         break;
+    case 0x7d:
+        spc_txa(SM_IMP);
+        break;
     case 0x7e:
         spc_cpy(SM_DIR_PAGE);
+        break;
+    case 0x84:
+        spc_adc(SM_DIR_PAGE);
+        break;
+    case 0x8d:
+        spc_ldy(SM_IMM);
         break;
     case 0x8f:
         spc_mov(SM_IMM_TO_DIR_PAGE);
         break;
+    case 0x90:
+        spc_bcc(SM_REL);
+        break;
     case 0x97:
         spc_adc(SM_INDY);
+        break;
+    case 0x9e:
+        spc_div(SM_IMP);
         break;
     case 0xab:
         spc_inc(SM_DIR_PAGE);
@@ -257,6 +293,9 @@ void spc_execute(void) {
     case 0xc8:
         spc_cpx(SM_IMM);
         break;
+    case 0xc9:
+        spc_stx(SM_ABS);
+        break;
     case 0xcb:
         spc_sty(SM_DIR_PAGE);
         break;
@@ -265,6 +304,9 @@ void spc_execute(void) {
         break;
     case 0xcd:
         spc_ldx(SM_IMM);
+        break;
+    case 0xcf:
+        spc_mul(SM_IMP);
         break;
     case 0xd0:
         spc_bne(SM_REL);
@@ -278,11 +320,20 @@ void spc_execute(void) {
     case 0xda:
         spc_stw(SM_DIR_PAGE);
         break;
+    case 0xdb:
+        spc_sty(SM_DIR_PAGEX);
+        break;
     case 0xdd:
         spc_tya(SM_IMP);
         break;
+    case 0xde:
+        spc_cbne(SM_DIR_PAGEX);
+        break;
     case 0xe4:
         spc_lda(SM_DIR_PAGE);
+        break;
+    case 0xe5:
+        spc_lda(SM_ABS);
         break;
     case 0xe8:
         spc_lda(SM_IMM);
@@ -293,8 +344,14 @@ void spc_execute(void) {
     case 0xec:
         spc_ldy(SM_ABS);
         break;
+    case 0xee:
+        spc_ply(SM_IMP);
+        break;
     case 0xf0:
         spc_beq(SM_REL);
+        break;
+    case 0xf4:
+        spc_lda(SM_DIR_PAGEX);
         break;
     case 0xf5:
         spc_lda(SM_ABSX);
