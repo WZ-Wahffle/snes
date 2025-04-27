@@ -14,18 +14,29 @@ void set_pixel(uint16_t x, uint16_t y, uint32_t color) {
 }
 
 void try_step_cpu(void) {
+    static bool prev_vblank = false;
     if (cpu.remaining_clocks > 0) {
         cpu_execute();
         if (cpu.breakpoint_valid && TO_U24(cpu.pc, cpu.pbr) == cpu.breakpoint) {
             cpu.state = STATE_STOPPED;
         }
+        bool curr_vblank =
+            cpu.vblank_nmi_enable && cpu.memory.vblank_has_occurred;
+        if (curr_vblank && !prev_vblank) {
+            if (!cpu.emulation_mode)
+                push_8(cpu.pbr);
+            push_16(cpu.pc);
+            push_8(cpu.p);
+            cpu.pc = read_16(cpu.emulation_mode ? 0xfffa : 0xffea, 0);
+        }
+        prev_vblank = curr_vblank;
     }
 }
 
 void try_step_spc(void) {
     if (spc.remaining_clocks > 0) {
         spc_execute();
-        if(spc.breakpoint_valid && spc.pc == spc.breakpoint) {
+        if (spc.breakpoint_valid && spc.pc == spc.breakpoint) {
             cpu.state = STATE_STOPPED;
         }
     }
@@ -43,6 +54,11 @@ void try_step_ppu(void) {
                 ppu.beam_y = 0;
             }
         }
+
+        if (ppu.beam_x == 0 && ppu.beam_y == 225)
+            cpu.memory.vblank_has_occurred = true;
+        if (ppu.beam_x == 339 && ppu.beam_y == 261)
+            cpu.memory.vblank_has_occurred = false;
 
         if (ppu.beam_x > 21 && ppu.beam_x < 278 && ppu.beam_y > 0 &&
             ppu.beam_y < 225) {
@@ -101,6 +117,34 @@ void ui(void) {
             }
         }
 
+        if (cpu.memory.joy_auto_read) {
+            cpu.memory.joy1l = 0;
+            cpu.memory.joy1l |=
+                IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_TRIGGER_1) << 4;
+            cpu.memory.joy1l |=
+                IsGamepadButtonDown(0, GAMEPAD_BUTTON_LEFT_TRIGGER_1) << 5;
+            cpu.memory.joy1l |=
+                IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_UP) << 6;
+            cpu.memory.joy1l |=
+                IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT) << 7;
+            cpu.memory.joy1l |=
+                IsGamepadButtonDown(0, GAMEPAD_BUTTON_LEFT_FACE_RIGHT) << 8;
+            cpu.memory.joy1l |=
+                IsGamepadButtonDown(0, GAMEPAD_BUTTON_LEFT_FACE_LEFT) << 9;
+            cpu.memory.joy1l |=
+                IsGamepadButtonDown(0, GAMEPAD_BUTTON_LEFT_FACE_DOWN) << 10;
+            cpu.memory.joy1l |=
+                IsGamepadButtonDown(0, GAMEPAD_BUTTON_LEFT_FACE_UP) << 11;
+            cpu.memory.joy1l |=
+                IsGamepadButtonDown(0, GAMEPAD_BUTTON_MIDDLE_RIGHT) << 12;
+            cpu.memory.joy1l |=
+                IsGamepadButtonDown(0, GAMEPAD_BUTTON_MIDDLE_LEFT) << 13;
+            cpu.memory.joy1l |=
+                IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_DOWN) << 14;
+            cpu.memory.joy1l |=
+                IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_LEFT) << 15;
+        }
+
         UpdateTexture(texture, framebuffer);
         DrawTexturePro(texture, (Rectangle){0, 0, WINDOW_WIDTH, WINDOW_HEIGHT},
                        (Rectangle){0, 0, GetScreenWidth(), GetScreenHeight()},
@@ -110,7 +154,7 @@ void ui(void) {
             view_debug_ui = !view_debug_ui;
         }
 
-        if(IsKeyPressed(KEY_F10)) {
+        if (IsKeyPressed(KEY_F10)) {
             cpu.state = STATE_RUNNING;
         }
 

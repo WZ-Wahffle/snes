@@ -91,7 +91,24 @@ uint8_t mmu_read(uint16_t addr, uint8_t bank, bool log) {
             case 0x2142:
             case 0x2143:
                 return spc.memory.ram[0xf4 + (addr - 0x2140)];
-                break;
+            case 0x4210: {
+                bool ret = cpu.memory.vblank_has_occurred;
+                cpu.memory.vblank_has_occurred = false;
+                return ret << 7;
+            }
+            case 0x4211: {
+                bool ret = cpu.memory.timer_has_occurred;
+                cpu.memory.timer_has_occurred = false;
+                return ret << 7;
+            }
+            case 0x4218:
+                return U16_LOBYTE(cpu.memory.joy1l);
+            case 0x4219:
+                return U16_HIBYTE(cpu.memory.joy1l);
+            case 0x421a:
+                return U16_LOBYTE(cpu.memory.joy2l);
+            case 0x421b:
+                return U16_HIBYTE(cpu.memory.joy2l);
             default:
                 UNREACHABLE_SWITCH(addr);
             }
@@ -127,6 +144,14 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                 ppu.oam_addr |= (value & 1) << 9;
                 ppu.oam_priority_rotation = value & 0x80;
                 break;
+            case 0x2105:
+                ppu.bg_mode = value & 0b111;
+                ppu.mode_1_bg3_prio = value & 8;
+                ppu.bg_config[0].large_characters = value & 16;
+                ppu.bg_config[1].large_characters = value & 32;
+                ppu.bg_config[2].large_characters = value & 64;
+                ppu.bg_config[3].large_characters = value & 128;
+                break;
             case 0x2106:
                 ppu.mosaic_size = value >> 4;
                 ppu.bg_config[0].enable_mosaic = value & 1;
@@ -143,12 +168,29 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                 ppu.bg_config[addr - 0x2107].tilemap_addr = (value & 0xfc) << 8;
                 break;
             case 0x210b:
-                ppu.bg_config[0].tiledata_addr = value & 0xf;
-                ppu.bg_config[1].tiledata_addr = value >> 4;
+                ppu.bg_config[0].tiledata_addr = (value & 0xf) << 12;
+                ppu.bg_config[1].tiledata_addr = (value >> 4) << 12;
                 break;
             case 0x210c:
-                ppu.bg_config[2].tiledata_addr = value & 0xf;
-                ppu.bg_config[3].tiledata_addr = value >> 4;
+                ppu.bg_config[2].tiledata_addr = (value & 0xf) << 12;
+                ppu.bg_config[3].tiledata_addr = (value >> 4) << 12;
+                break;
+            case 0x210d:
+            case 0x210f:
+            case 0x2111:
+            case 0x2113:
+                ppu.bg_config[(addr - 0x210d) / 2].h_scroll =
+                    (value << 8) | (ppu.bg_scroll_latch & ~7) |
+                    ((ppu.bg_config[(addr - 0x210d) / 2].h_scroll >> 8) & 7);
+                ppu.bg_scroll_latch = value;
+                break;
+            case 0x210e:
+            case 0x2110:
+            case 0x2112:
+            case 0x2114:
+                ppu.bg_config[(addr - 0x210e) / 2].v_scroll =
+                    (value << 8) | ppu.bg_scroll_latch;
+                ppu.bg_scroll_latch = value;
                 break;
             case 0x2115:
                 ppu.address_increment_amount = value & 0b11;
@@ -166,7 +208,6 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
             case 0x2118:
             case 0x2119: {
                 uint16_t actual_addr = (ppu.vram_addr << 1) + (addr - 0x2118);
-                printf("Write of 0x%02x to 0x%04x, vram addr 0x%04x\n", value, addr, actual_addr);
                 switch (ppu.address_remapping) {
                 case 0:
                     // this page intentionally left blank
@@ -214,6 +255,50 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                 ppu.mode_7_non_tilemap_fill = value & 64;
                 ppu.mode_7_tilemap_repeat = value & 128;
                 break;
+            case 0x2121:
+                ppu.cgram_addr = value;
+                ppu.cgram_latched = false;
+                break;
+            case 0x2122:
+                if (!ppu.cgram_latched) {
+                    ppu.cgram_latch = value;
+                    ppu.cgram_latched = true;
+                } else {
+                    ppu.cgram[ppu.cgram_addr++] =
+                        TO_U16(ppu.cgram_latch, value);
+                    ppu.cgram_latched = false;
+                }
+                break;
+            case 0x2123:
+                ppu.bg_config[0].window_1_invert = value & 1;
+                ppu.bg_config[0].window_1_enable = value & 2;
+                ppu.bg_config[0].window_2_invert = value & 4;
+                ppu.bg_config[0].window_2_enable = value & 8;
+                ppu.bg_config[1].window_1_invert = value & 16;
+                ppu.bg_config[1].window_1_enable = value & 32;
+                ppu.bg_config[1].window_2_invert = value & 64;
+                ppu.bg_config[1].window_2_enable = value & 128;
+                break;
+            case 0x2124:
+                ppu.bg_config[2].window_1_invert = value & 1;
+                ppu.bg_config[2].window_1_enable = value & 2;
+                ppu.bg_config[2].window_2_invert = value & 4;
+                ppu.bg_config[2].window_2_enable = value & 8;
+                ppu.bg_config[3].window_1_invert = value & 16;
+                ppu.bg_config[3].window_1_enable = value & 32;
+                ppu.bg_config[3].window_2_invert = value & 64;
+                ppu.bg_config[3].window_2_enable = value & 128;
+                break;
+            case 0x2125:
+                ppu.obj_window_1_invert = value & 1;
+                ppu.obj_window_1_enable = value & 2;
+                ppu.obj_window_2_invert = value & 4;
+                ppu.obj_window_2_enable = value & 8;
+                ppu.col_window_1_invert = value & 16;
+                ppu.col_window_1_enable = value & 32;
+                ppu.col_window_2_invert = value & 64;
+                ppu.col_window_2_enable = value & 128;
+                break;
             case 0x212a:
                 ppu.bg_config[0].mask_logic = (value >> 0) & 0b11;
                 ppu.bg_config[1].mask_logic = (value >> 2) & 0b11;
@@ -223,6 +308,20 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
             case 0x212b:
                 ppu.obj_window_mask_logic = (value >> 0) & 0b11;
                 ppu.col_window_mask_logic = (value >> 2) & 0b11;
+                break;
+            case 0x212c:
+                ppu.bg_config[0].main_screen_enable = value & 1;
+                ppu.bg_config[1].main_screen_enable = value & 2;
+                ppu.bg_config[2].main_screen_enable = value & 4;
+                ppu.bg_config[3].main_screen_enable = value & 8;
+                ppu.obj_main_screen_enable = value & 16;
+                break;
+            case 0x212d:
+                ppu.bg_config[0].sub_screen_enable = value & 1;
+                ppu.bg_config[1].sub_screen_enable = value & 2;
+                ppu.bg_config[2].sub_screen_enable = value & 4;
+                ppu.bg_config[3].sub_screen_enable = value & 8;
+                ppu.obj_sub_screen_enable = value & 16;
                 break;
             case 0x212e:
                 ppu.bg_config[0].main_window_enable = value & 1;
@@ -238,6 +337,36 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                 ppu.bg_config[3].sub_window_enable = value & 8;
                 ppu.obj_sub_window_enable = value & 16;
                 break;
+            case 0x2130:
+                ppu.direct_color_mode = value & 1;
+                ppu.addend_subscreen = value & 2;
+                ppu.sub_window_transparent_region = (value >> 4) & 0b11;
+                ppu.main_window_black_region = (value >> 6) & 0b11;
+                break;
+            case 0x2131:
+                ppu.bg_config[0].color_math_enable = value & 1;
+                ppu.bg_config[1].color_math_enable = value & 2;
+                ppu.bg_config[2].color_math_enable = value & 4;
+                ppu.bg_config[3].color_math_enable = value & 8;
+                ppu.obj_color_math_enable = value & 16;
+                ppu.backdrop_color_math_enable = value & 32;
+                ppu.half_color_math = value & 64;
+                ppu.color_math_subtract = value & 128;
+                break;
+            case 0x2132:
+                if (value & 0x80) {
+                    ppu.fixed_color &= ~(0x1f << 10);
+                    ppu.fixed_color |= (value & 0x1f) << 10;
+                }
+                if (value & 0x40) {
+                    ppu.fixed_color &= ~(0x1f << 5);
+                    ppu.fixed_color |= (value & 0x1f) << 5;
+                }
+                if (value & 0x20) {
+                    ppu.fixed_color &= ~(0x1f << 0);
+                    ppu.fixed_color |= (value & 0x1f) << 0;
+                }
+                break;
             case 0x2133:
                 ppu.display_config = value;
                 break;
@@ -252,6 +381,7 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                 cpu.memory.apu_io[addr - 0x2140] = value;
                 break;
             case 0x4200:
+                cpu.memory.joy_auto_read = value & 1;
                 cpu.vblank_nmi_enable = value & 0x80;
                 cpu.timer_irq = (value >> 4) & 0b11;
                 break;

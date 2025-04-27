@@ -237,6 +237,10 @@ uint16_t resolve_read16(addressing_mode_t mode, bool respect_x,
     case AM_STK_REL:
     case AM_STK_REL_INDY: {
         uint32_t addr = resolve_addr(mode);
+        if ((get_status_bit(STATUS_XNARROW) && respect_x) ||
+            (get_status_bit(STATUS_MEMNARROW) && respect_m)) {
+            return read_8(U24_LOSHORT(addr), U24_HIBYTE(addr));
+        }
         return read_16(U24_LOSHORT(addr), U24_HIBYTE(addr));
     }
     case AM_ACC:
@@ -257,6 +261,11 @@ uint16_t resolve_read8(addressing_mode_t mode) {
     switch (mode) {
     case AM_IMM:
         return next_8();
+    case AM_ABS:
+    case AM_ABSX: {
+        uint32_t addr = resolve_addr(mode);
+        return read_8(U24_LOSHORT(addr), U24_HIBYTE(addr));
+    }
     default:
         UNREACHABLE_SWITCH(mode);
     }
@@ -338,20 +347,35 @@ void cpu_execute(void) {
     case 0x2a:
         rol(AM_ACC);
         break;
+    case 0x2d:
+        and_(AM_ABS);
+        break;
     case 0x30:
         bmi(AM_PC_REL);
         break;
     case 0x38:
         sec(AM_IMP);
         break;
+    case 0x3a:
+        dec(AM_ACC);
+        break;
+    case 0x40:
+        rti(AM_STK);
+        break;
     case 0x48:
         pha(AM_STK);
+        break;
+    case 0x4a:
+        lsr(AM_ACC);
         break;
     case 0x4b:
         phk(AM_STK);
         break;
     case 0x4c:
         jmp(AM_ABS);
+        break;
+    case 0x4d:
+        eor(AM_ABS);
         break;
     case 0x58:
         cli(AM_IMP);
@@ -379,6 +403,9 @@ void cpu_execute(void) {
         break;
     case 0x6b:
         rtl(AM_IMP);
+        break;
+    case 0x6d:
+        adc(AM_ABS);
         break;
     case 0x70:
         bvs(AM_PC_REL);
@@ -418,6 +445,9 @@ void cpu_execute(void) {
         break;
     case 0x8d:
         sta(AM_ABS);
+        break;
+    case 0x8e:
+        stx(AM_ABS);
         break;
     case 0x8f:
         sta(AM_ABS_L);
@@ -479,6 +509,9 @@ void cpu_execute(void) {
     case 0xab:
         plb(AM_STK);
         break;
+    case 0xac:
+        ldy(AM_ABS);
+        break;
     case 0xad:
         lda(AM_ABS);
         break;
@@ -500,8 +533,14 @@ void cpu_execute(void) {
     case 0xbb:
         tyx(AM_IMP);
         break;
+    case 0xbc:
+        ldy(AM_ABSX);
+        break;
     case 0xbd:
         lda(AM_ABSX);
+        break;
+    case 0xbe:
+        ldx(AM_ABSY);
         break;
     case 0xc0:
         cpy(AM_IMM);
@@ -521,11 +560,20 @@ void cpu_execute(void) {
     case 0xca:
         dex(AM_IMP);
         break;
+    case 0xcc:
+        cpy(AM_ABS);
+        break;
     case 0xcd:
         cmp(AM_ABS);
         break;
+    case 0xce:
+        dec(AM_ABS);
+        break;
     case 0xd0:
         bne(AM_PC_REL);
+        break;
+    case 0xda:
+        phx(AM_STK);
         break;
     case 0xdc:
         jml(AM_IND);
@@ -548,8 +596,17 @@ void cpu_execute(void) {
     case 0xeb:
         xba(AM_IMP);
         break;
+    case 0xec:
+        cpx(AM_ABS);
+        break;
+    case 0xee:
+        inc(AM_ABS);
+        break;
     case 0xf0:
         beq(AM_PC_REL);
+        break;
+    case 0xfa:
+        plx(AM_STK);
         break;
     case 0xfb:
         xce(AM_ACC);

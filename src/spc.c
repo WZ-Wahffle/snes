@@ -73,6 +73,8 @@ uint8_t spc_resolve_read(spc_addressing_mode_t mode) {
     case SM_DIR_PAGEY:
         return spc_read_8((spc_next_8() + spc.y) % 0x100 +
                           spc_get_status_bit(STATUS_DIRECTPAGE) * 0x100);
+    case SM_INDX:
+        return spc_read_8(spc_read_16(spc_next_16() + spc.x));
     case SM_INDY:
         return spc_read_8(spc_read_16(spc_next_16()) + spc.y);
     default:
@@ -197,8 +199,14 @@ void spc_execute(void) {
         timer_timer -= 128;
     }
     switch (opcode) {
+    case 0x0a:
+        spc_or1(SM_ABS_BOOL_BIT);
+        break;
     case 0x10:
         spc_bpl(SM_REL);
+        break;
+    case 0x1c:
+        spc_asl(SM_ACC);
         break;
     case 0x1d:
         spc_dex(SM_IMP);
@@ -208,6 +216,9 @@ void spc_execute(void) {
         break;
     case 0x20:
         spc_clp(SM_IMP);
+        break;
+    case 0x2a:
+        spc_or1(SM_ABS_BOOL_BIT_INV);
         break;
     case 0x2f:
         spc_bra(SM_REL);
@@ -235,6 +246,9 @@ void spc_execute(void) {
         break;
     case 0x6d:
         spc_phy(SM_IMP);
+        break;
+    case 0x6e:
+        spc_dbnz(SM_DIR_PAGE);
         break;
     case 0x6f:
         spc_rts(SM_IMP);
@@ -280,6 +294,9 @@ void spc_execute(void) {
         break;
     case 0xbd:
         spc_txs(SM_IMP);
+        break;
+    case 0xc2:
+        spc_set6(SM_DIR_PAGE_BIT);
         break;
     case 0xc4:
         spc_sta(SM_DIR_PAGE);
@@ -335,6 +352,9 @@ void spc_execute(void) {
     case 0xe5:
         spc_lda(SM_ABS);
         break;
+    case 0xe7:
+        spc_lda(SM_INDX);
+        break;
     case 0xe8:
         spc_lda(SM_IMM);
         break;
@@ -355,6 +375,9 @@ void spc_execute(void) {
         break;
     case 0xf5:
         spc_lda(SM_ABSX);
+        break;
+    case 0xf6:
+        spc_lda(SM_ABSY);
         break;
     case 0xfc:
         spc_iny(SM_IMP);

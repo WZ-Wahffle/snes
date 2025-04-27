@@ -202,6 +202,27 @@ OP(cbne) {
     }
 }
 
+OP(dbnz) {
+    LEGALADDRMODES(SM_DIR_PAGE | SM_Y);
+    if (mode == SM_Y) {
+        spc.y--;
+        if (spc.y != 0) {
+            spc.pc += (int8_t)spc_next_8();
+        } else {
+            spc.pc++;
+        }
+    } else {
+        uint16_t addr = spc_resolve_addr(mode);
+        uint8_t val = spc_read_8(addr) - 1;
+        spc_write_8(addr, val);
+        if (val != 0) {
+            spc.pc += (int8_t)spc_next_8();
+        } else {
+            spc.pc++;
+        }
+    }
+}
+
 OP(jmp) {
     LEGALADDRMODES(SM_ABS | SM_ABS_INDX);
     spc.pc = spc_resolve_addr(mode);
@@ -364,6 +385,23 @@ OP(div) {
     spc_set_status_bit(STATUS_NEGATIVE, spc.a & 0x80);
 }
 
+OP(asl) {
+    LEGALADDRMODES(SM_ACC | SM_DIR_PAGE | SM_DIR_PAGEX | SM_ABS);
+    if (mode == SM_ACC) {
+        spc_set_status_bit(STATUS_CARRY, spc.a & 0x80);
+        spc.a <<= 1;
+        spc_set_status_bit(STATUS_ZERO, spc.a == 0);
+        spc_set_status_bit(STATUS_NEGATIVE, spc.a & 0x80);
+    } else {
+        uint16_t addr = spc_resolve_addr(mode);
+        uint8_t val = spc_read_8(addr);
+        spc_set_status_bit(STATUS_CARRY, val & 0x80);
+        val <<= 1;
+        spc_set_status_bit(STATUS_ZERO, val == 0);
+        spc_set_status_bit(STATUS_NEGATIVE, val & 0x80);
+    }
+}
+
 OP(clp) {
     LEGALADDRMODES(SM_IMP);
     spc_set_status_bit(STATUS_DIRECTPAGE, false);
@@ -372,4 +410,38 @@ OP(clp) {
 OP(clc) {
     LEGALADDRMODES(SM_IMP);
     spc_set_status_bit(STATUS_CARRY, false);
+}
+
+#define OP_SET(x)                                                              \
+    OP(set##x) {                                                               \
+        LEGALADDRMODES(SM_DIR_PAGE_BIT);                                       \
+        uint16_t addr = spc_resolve_addr(SM_DIR_PAGE);                         \
+        spc_write_8(addr, spc_read_8(addr) | (1 << x));                        \
+    }
+
+OP_SET(0);
+OP_SET(1);
+OP_SET(2);
+OP_SET(3);
+OP_SET(4);
+OP_SET(5);
+OP_SET(6);
+OP_SET(7);
+
+#undef OP_SET
+
+OP(or1) {
+    LEGALADDRMODES(SM_ABS_BOOL_BIT | SM_ABS_BOOL_BIT_INV);
+    uint16_t addr = spc_next_16();
+    uint8_t bit = addr >> 13;
+    addr &= 0x1fff;
+    if (mode == SM_ABS_BOOL_BIT) {
+        spc_set_status_bit(STATUS_CARRY,
+                           spc_get_status_bit(STATUS_CARRY) ||
+                               (((spc_read_8(addr) >> bit) & 1) == 1));
+    } else {
+        spc_set_status_bit(STATUS_CARRY,
+                           spc_get_status_bit(STATUS_CARRY) ||
+                               (((spc_read_8(addr) >> bit) & 1) == 0));
+    }
 }

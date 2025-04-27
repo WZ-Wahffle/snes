@@ -433,7 +433,7 @@ OP(inc) {
 
 OP(dec) {
     LEGALADDRMODES(AM_ABS | AM_ACC | AM_ABSX | AM_DIR | AM_ZBKX_DIR);
-    if(mode == AM_ACC) {
+    if (mode == AM_ACC) {
         uint16_t val = read_r(R_C) - 1;
         write_r(R_C, val);
         set_status_bit(STATUS_ZERO, read_r(R_C) == 0);
@@ -525,6 +525,22 @@ OP(ora) {
         write_r(R_C, read_r(R_C) | resolve_read8(mode));
     } else {
         write_r(R_C, read_r(R_C) | resolve_read16(mode, false, false));
+    }
+    set_status_bit(STATUS_ZERO, read_r(R_C) == 0);
+    set_status_bit(STATUS_NEGATIVE, get_status_bit(STATUS_MEMNARROW)
+                                        ? (read_r(R_C) & 0x80)
+                                        : (read_r(R_C) & 0x8000));
+}
+
+OP(eor) {
+    LEGALADDRMODES(AM_ABS | AM_ABSX | AM_ABSY | AM_ABS_L | AM_ABSX_L | AM_DIR |
+                   AM_STK_REL | AM_ZBKX_DIR | AM_IND_DIR | AM_IND_DIR_L |
+                   AM_STK_REL_INDY | AM_INDX_DIR | AM_INDY_DIR | AM_INDY_DIR_L |
+                   AM_IMM | AM_INDX);
+    if (get_status_bit(STATUS_MEMNARROW)) {
+        write_r(R_C, read_r(R_C) ^ resolve_read8(mode));
+    } else {
+        write_r(R_C, read_r(R_C) ^ resolve_read16(mode, false, false));
     }
     set_status_bit(STATUS_ZERO, read_r(R_C) == 0);
     set_status_bit(STATUS_NEGATIVE, get_status_bit(STATUS_MEMNARROW)
@@ -650,6 +666,14 @@ OP(rtl) {
     cpu.pc = U24_LOSHORT(addr);
 }
 
+OP(rti) {
+    LEGALADDRMODES(AM_STK);
+    cpu.p = pop_8();
+    cpu.pc = pop_16();
+    if (!cpu.emulation_mode)
+        cpu.pbr = pop_8();
+}
+
 OP(php) {
     LEGALADDRMODES(AM_STK);
     push_8(cpu.p);
@@ -680,6 +704,28 @@ OP(pla) {
     set_status_bit(STATUS_NEGATIVE, get_status_bit(STATUS_MEMNARROW)
                                         ? (read_r(R_C) & 0x80)
                                         : read_r(R_C) & 0x8000);
+}
+
+OP(phx) {
+    LEGALADDRMODES(AM_STK);
+    if (get_status_bit(STATUS_XNARROW)) {
+        push_8(read_r(R_X));
+    } else {
+        push_16(read_r(R_X));
+    }
+}
+
+OP(plx) {
+    LEGALADDRMODES(AM_STK);
+    if (get_status_bit(STATUS_XNARROW)) {
+        write_r(R_X, pop_8());
+    } else {
+        write_r(R_X, pop_16());
+    }
+    set_status_bit(STATUS_ZERO, read_r(R_X) == 0);
+    set_status_bit(STATUS_NEGATIVE, get_status_bit(STATUS_XNARROW)
+                                        ? (read_r(R_X) & 0x80)
+                                        : read_r(R_X) & 0x8000);
 }
 
 OP(phy) {
@@ -783,6 +829,36 @@ OP(asl) {
                                0x8000);
             uint16_t result =
                 (read_16(U24_LOSHORT(addr), U24_HIBYTE(addr)) << 1);
+            write_16(U24_LOSHORT(addr), U24_HIBYTE(addr), result);
+            set_status_bit(STATUS_ZERO, result == 0);
+            set_status_bit(STATUS_NEGATIVE, result & 0x8000);
+        }
+    }
+}
+
+OP(lsr) {
+    LEGALADDRMODES(AM_ABS | AM_ACC | AM_ABSX | AM_DIR | AM_ZBKX_DIR);
+    if (mode == AM_ACC) {
+        set_status_bit(STATUS_CARRY, read_r(R_C) & 1);
+        write_r(R_C, read_r(R_C) >> 1);
+        set_status_bit(STATUS_ZERO, read_r(R_C) == 0);
+        set_status_bit(STATUS_NEGATIVE, get_status_bit(STATUS_MEMNARROW)
+                                            ? (read_r(R_C) & 0x80)
+                                            : read_r(R_C) & 0x8000);
+    } else {
+        uint32_t addr = resolve_addr(mode);
+        if (cpu.emulation_mode) {
+            set_status_bit(STATUS_CARRY,
+                           read_8(U24_LOSHORT(addr), U24_HIBYTE(addr)) & 1);
+            uint8_t result = read_8(U24_LOSHORT(addr), U24_HIBYTE(addr)) >> 1;
+            write_8(U24_LOSHORT(addr), U24_HIBYTE(addr), result);
+            set_status_bit(STATUS_ZERO, result == 0);
+            set_status_bit(STATUS_NEGATIVE, result & 0x80);
+        } else {
+            set_status_bit(STATUS_CARRY,
+                           read_16(U24_LOSHORT(addr), U24_HIBYTE(addr)) & 1);
+            uint16_t result =
+                (read_16(U24_LOSHORT(addr), U24_HIBYTE(addr)) >> 1);
             write_16(U24_LOSHORT(addr), U24_HIBYTE(addr), result);
             set_status_bit(STATUS_ZERO, result == 0);
             set_status_bit(STATUS_NEGATIVE, result & 0x8000);

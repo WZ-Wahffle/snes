@@ -103,6 +103,8 @@ typedef enum {
     SM_IMM = 262144,              // Immediate - #
     SM_ACC = 524288,              // Accumulator - A
     SM_IMP = 1048576,             // Implied
+    SM_Y = 2097152,               // Y register - y
+    SM_ABS_BOOL_BIT_INV = 4194304 // Absolute Boolean Bit Inverted - /m.b
 } spc_addressing_mode_t;
 
 typedef enum {
@@ -153,6 +155,12 @@ typedef struct {
     } dmas[8];
 
     uint8_t apu_io[4];
+    bool vblank_has_occurred;
+    bool timer_has_occurred;
+
+    bool joy_auto_read;
+    uint16_t joy1l, joy1h;
+    uint16_t joy2l, joy2h;
 } cpu_mmu_t;
 
 typedef struct {
@@ -236,22 +244,54 @@ typedef struct {
 
     uint8_t display_config;
     struct background_props_t {
+        bool large_characters;
         bool enable_mosaic;
         bool double_h_tilemap, double_v_tilemap;
         uint16_t tilemap_addr;
         uint16_t tiledata_addr;
+        uint16_t h_scroll;
+        uint16_t v_scroll;
         uint8_t mask_logic;
+        bool window_1_enable, window_2_enable;
         bool main_window_enable, sub_window_enable;
+        bool window_1_invert, window_2_invert;
+        bool main_screen_enable, sub_screen_enable;
+        bool color_math_enable;
     } bg_config[4];
+    uint8_t bg_scroll_latch;
+
+    uint8_t bg_mode;
+    bool mode_1_bg3_prio;
 
     uint8_t obj_window_mask_logic;
     uint8_t col_window_mask_logic;
+    bool obj_window_1_enable, obj_window_2_enable;
+    bool col_window_1_enable, col_window_2_enable;
     bool obj_main_window_enable, obj_sub_window_enable;
+    bool obj_window_1_invert, obj_window_2_invert;
+    bool col_window_1_invert, col_window_2_invert;
+    bool obj_main_screen_enable, obj_sub_screen_enable;
+    bool obj_color_math_enable;
+    bool backdrop_color_math_enable;
+    bool half_color_math;
+    bool color_math_subtract;
+    uint16_t fixed_color;
 
-    bool mode_7_flip_h, mode_7_flip_v, mode_7_non_tilemap_fill, mode_7_tilemap_repeat;
+    bool direct_color_mode;
+    bool addend_subscreen;
+    uint8_t sub_window_transparent_region;
+    uint8_t main_window_black_region;
+
+    bool mode_7_flip_h, mode_7_flip_v, mode_7_non_tilemap_fill,
+        mode_7_tilemap_repeat;
 
     uint16_t vram_addr;
     uint8_t vram[0x10000];
+
+    uint8_t cgram_addr;
+    bool cgram_latched;
+    uint8_t cgram_latch;
+    uint16_t cgram[0x100];
 } ppu_t;
 
 #ifdef __cplusplus
@@ -290,6 +330,7 @@ EXTERNC uint8_t spc_read_8(uint16_t addr);
 EXTERNC uint8_t spc_read_8_no_log(uint16_t addr);
 EXTERNC uint16_t spc_read_16(uint16_t addr);
 EXTERNC uint8_t spc_next_8(void);
+EXTERNC uint16_t spc_next_16(void);
 EXTERNC void spc_write_8(uint16_t addr, uint8_t val);
 EXTERNC void spc_write_16(uint16_t addr, uint16_t val);
 EXTERNC void spc_push_8(uint8_t val);

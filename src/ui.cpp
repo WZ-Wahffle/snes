@@ -65,6 +65,51 @@ void cpu_window(void) {
     ImGui::End();
 }
 
+int bg_selected = 0;
+void ppu_window(void) {
+    ImGui::Begin("ppu", NULL, ImGuiWindowFlags_HorizontalScrollbar);
+
+    ImGui::InputInt("Channel", &bg_selected, 1, 1,
+                    ImGuiInputTextFlags_CharsDecimal);
+    if (bg_selected > 3)
+        bg_selected = 3;
+    if (bg_selected < 0)
+        bg_selected = 0;
+
+    ImGui::Text("Tile Data Addr: 0x%02x",
+                ppu.bg_config[bg_selected].tiledata_addr);
+    ImGui::Text("Tile Map Addr: 0x%02x",
+                ppu.bg_config[bg_selected].tilemap_addr);
+    ImGui::End();
+}
+
+int32_t vram_page = 0;
+void vram_window(void) {
+    ImGui::Begin("vram", NULL, ImGuiWindowFlags_HorizontalScrollbar);
+    ImGui::InputInt("Page", &vram_page, 1, 16,
+                    ImGuiInputTextFlags_CharsHexadecimal);
+    if (vram_page < 0)
+        vram_page = 0;
+    if (vram_page > 0xff)
+        vram_page = 0xff;
+    if (ImGui::BeginTable("##vram", 16,
+                          ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
+        for (uint16_t i = 0; i < 16; i++) {
+            for (uint8_t j = 0; j < 16; j++) {
+                ImGui::TableNextColumn();
+                ImGui::Text("%02x", ppu.vram[vram_page * 0x100 + i * 16 + j]);
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("0x%04x", vram_page * 0x100 + i * 16 + j);
+                }
+            }
+            if (i != 15)
+                ImGui::TableNextRow();
+        }
+        ImGui::EndTable();
+    }
+    ImGui::End();
+}
+
 char spc_bp_inter[5] = {0};
 void spc_window(void) {
     ImGui::Begin("spc", NULL, ImGuiWindowFlags_HorizontalScrollbar);
@@ -110,7 +155,7 @@ void spc_window(void) {
     ImGui::End();
 }
 
-int32_t spc_ram_page = 0;
+int spc_ram_page = 0;
 void spc_ram_window(void) {
     ImGui::Begin("spc ram", NULL, ImGuiWindowFlags_HorizontalScrollbar);
     ImGui::InputInt("Page", &spc_ram_page, 0, 0,
@@ -265,6 +310,8 @@ void cpp_imgui_render(void) {
     rlImGuiBegin();
     spc_window();
     spc_ram_window();
+    vram_window();
+    ppu_window();
     cpu_ram_window();
     cpu_rom_window();
     cpu_window();
