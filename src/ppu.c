@@ -1,6 +1,7 @@
 #include "ppu.h"
 #include "raylib.h"
 #include "spc.h"
+#include "types.h"
 
 extern cpu_t cpu;
 extern ppu_t ppu;
@@ -107,6 +108,10 @@ void ui(void) {
 
         if (IsKeyPressed(KEY_TAB)) {
             view_debug_ui = !view_debug_ui;
+        }
+
+        if(IsKeyPressed(KEY_F10)) {
+            cpu.state = STATE_RUNNING;
         }
 
         if (view_debug_ui) {

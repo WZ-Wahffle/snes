@@ -1,4 +1,5 @@
 #include "cpu_mmu.h"
+#include "types.h"
 
 extern cpu_t cpu;
 extern ppu_t ppu;
@@ -117,6 +118,38 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                 ppu.name_select = (value >> 3) & 0b11;
                 ppu.name_base_address = value & 0b111;
                 break;
+            case 0x2102:
+                ppu.oam_addr &= ~(0xff << 1);
+                ppu.oam_addr |= (value << 1);
+                break;
+            case 0x2103:
+                ppu.oam_addr &= (1 << 9);
+                ppu.oam_addr |= (value & 1) << 9;
+                ppu.oam_priority_rotation = value & 0x80;
+                break;
+            case 0x2106:
+                ppu.mosaic_size = value >> 4;
+                ppu.bg_config[0].enable_mosaic = value & 1;
+                ppu.bg_config[1].enable_mosaic = value & 2;
+                ppu.bg_config[2].enable_mosaic = value & 4;
+                ppu.bg_config[3].enable_mosaic = value & 8;
+                break;
+            case 0x2107:
+            case 0x2108:
+            case 0x2109:
+            case 0x210a:
+                ppu.bg_config[addr - 0x2107].double_h_tilemap = value & 1;
+                ppu.bg_config[addr - 0x2107].double_v_tilemap = value & 2;
+                ppu.bg_config[addr - 0x2107].tilemap_addr = (value & 0xfc) << 8;
+                break;
+            case 0x210b:
+                ppu.bg_config[0].tiledata_addr = value & 0xf;
+                ppu.bg_config[1].tiledata_addr = value >> 4;
+                break;
+            case 0x210c:
+                ppu.bg_config[2].tiledata_addr = value & 0xf;
+                ppu.bg_config[3].tiledata_addr = value >> 4;
+                break;
             case 0x2115:
                 ppu.address_increment_amount = value & 0b11;
                 ppu.address_remapping = (value >> 2) & 0b11;
@@ -129,6 +162,84 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
             case 0x2117:
                 ppu.vram_addr &= 0xff;
                 ppu.vram_addr |= value << 8;
+                break;
+            case 0x2118:
+            case 0x2119: {
+                uint16_t actual_addr = (ppu.vram_addr << 1) + (addr - 0x2118);
+                printf("Write of 0x%02x to 0x%04x, vram addr 0x%04x\n", value, addr, actual_addr);
+                switch (ppu.address_remapping) {
+                case 0:
+                    // this page intentionally left blank
+                    break;
+                case 1:
+                    actual_addr = (actual_addr & 0xff00) |
+                                  ((actual_addr << 3) & 0xf8) |
+                                  ((actual_addr >> 5) & 0x7);
+                    break;
+                case 2:
+                    actual_addr = (actual_addr & 0xfe00) |
+                                  ((actual_addr << 3) & 0x1f8) |
+                                  ((actual_addr >> 6) & 0x7);
+                    break;
+                case 3:
+                    actual_addr = (actual_addr & 0xfc00) |
+                                  ((actual_addr << 3) & 0x3f8) |
+                                  ((actual_addr >> 7) & 0x7);
+                    break;
+                default:
+                    UNREACHABLE_SWITCH(ppu.address_remapping);
+                }
+
+                ppu.vram[actual_addr] = value;
+                if (ppu.address_increment_mode == (addr - 0x2118)) {
+                    switch (ppu.address_increment_amount) {
+                    case 0:
+                        ppu.vram_addr++;
+                        break;
+                    case 1:
+                        ppu.vram_addr += 32;
+                        break;
+                    case 2:
+                    case 3:
+                        ppu.vram_addr += 128;
+                        break;
+                    default:
+                        UNREACHABLE_SWITCH(ppu.address_increment_amount);
+                    }
+                }
+            } break;
+            case 0x211a:
+                ppu.mode_7_flip_h = value & 1;
+                ppu.mode_7_flip_v = value & 2;
+                ppu.mode_7_non_tilemap_fill = value & 64;
+                ppu.mode_7_tilemap_repeat = value & 128;
+                break;
+            case 0x212a:
+                ppu.bg_config[0].mask_logic = (value >> 0) & 0b11;
+                ppu.bg_config[1].mask_logic = (value >> 2) & 0b11;
+                ppu.bg_config[2].mask_logic = (value >> 4) & 0b11;
+                ppu.bg_config[3].mask_logic = (value >> 6) & 0b11;
+                break;
+            case 0x212b:
+                ppu.obj_window_mask_logic = (value >> 0) & 0b11;
+                ppu.col_window_mask_logic = (value >> 2) & 0b11;
+                break;
+            case 0x212e:
+                ppu.bg_config[0].main_window_enable = value & 1;
+                ppu.bg_config[1].main_window_enable = value & 2;
+                ppu.bg_config[2].main_window_enable = value & 4;
+                ppu.bg_config[3].main_window_enable = value & 8;
+                ppu.obj_main_window_enable = value & 16;
+                break;
+            case 0x212f:
+                ppu.bg_config[0].sub_window_enable = value & 1;
+                ppu.bg_config[1].sub_window_enable = value & 2;
+                ppu.bg_config[2].sub_window_enable = value & 4;
+                ppu.bg_config[3].sub_window_enable = value & 8;
+                ppu.obj_sub_window_enable = value & 16;
+                break;
+            case 0x2133:
+                ppu.display_config = value;
                 break;
             case 0x2140:
             case 0x2141:

@@ -230,6 +230,25 @@ typedef struct {
     bool address_increment_mode;
     double remaining_clocks;
     uint16_t beam_x, beam_y;
+    uint16_t oam_addr;
+    bool oam_priority_rotation;
+    uint8_t mosaic_size;
+
+    uint8_t display_config;
+    struct background_props_t {
+        bool enable_mosaic;
+        bool double_h_tilemap, double_v_tilemap;
+        uint16_t tilemap_addr;
+        uint16_t tiledata_addr;
+        uint8_t mask_logic;
+        bool main_window_enable, sub_window_enable;
+    } bg_config[4];
+
+    uint8_t obj_window_mask_logic;
+    uint8_t col_window_mask_logic;
+    bool obj_main_window_enable, obj_sub_window_enable;
+
+    bool mode_7_flip_h, mode_7_flip_v, mode_7_non_tilemap_fill, mode_7_tilemap_repeat;
 
     uint16_t vram_addr;
     uint8_t vram[0x10000];
@@ -277,8 +296,6 @@ EXTERNC void spc_push_8(uint8_t val);
 EXTERNC void spc_push_16(uint16_t val);
 EXTERNC uint8_t spc_pop_8(void);
 EXTERNC uint16_t spc_pop_16(void);
-
-
 
 static void log_message(log_level_t level, char *message, ...) {
 #ifdef LOG_LEVEL

@@ -23,18 +23,18 @@ void cpu_window(void) {
         cpu.state = STATE_STEPPED;
     ImGui::NewLine();
     ImGui::Text("Mode: %s", cpu.emulation_mode ? "emulation" : "native");
-    ImGui::Text((cpu.emulation_mode || get_status_bit(STATUS_MEMNARROW))
-                    ? "C: 0x%02x"
-                    : "C: 0x%04x",
-                cpu.c);
-    ImGui::Text((cpu.emulation_mode || get_status_bit(STATUS_XNARROW))
-                    ? "X: 0x%02x"
-                    : "X: 0x%04x",
-                cpu.x);
-    ImGui::Text((cpu.emulation_mode || get_status_bit(STATUS_XNARROW))
-                    ? "Y: 0x%02x"
-                    : "Y: 0x%04x",
-                cpu.y);
+    ImGui::Text("C: 0x%04x, %s", cpu.c,
+                (cpu.emulation_mode || get_status_bit(STATUS_MEMNARROW))
+                    ? "short"
+                    : "long");
+    ImGui::Text("X: 0x%04x, %s", cpu.x,
+                (cpu.emulation_mode || get_status_bit(STATUS_XNARROW))
+                    ? "short"
+                    : "long");
+    ImGui::Text("Y: 0x%04x, %s", cpu.y,
+                (cpu.emulation_mode || get_status_bit(STATUS_XNARROW))
+                    ? "short"
+                    : "long");
     ImGui::Text("D: 0x%04x", cpu.d);
     ImGui::Text("SP: 0x%04x", cpu.s);
     ImGui::Text("P: 0x%02x", cpu.p);
@@ -245,7 +245,7 @@ void dsp_window(void) {
                 spc.memory.channels[dsp_selected].sample_source_directory);
     ImGui::Text("ADSR %sabled",
                 spc.memory.channels[dsp_selected].adsr_enable ? "en" : "dis");
-    if(spc.memory.channels[dsp_selected].adsr_enable) {
+    if (spc.memory.channels[dsp_selected].adsr_enable) {
         ImGui::Text("A: %d", spc.memory.channels[dsp_selected].a_rate);
         ImGui::Text("D: %d", spc.memory.channels[dsp_selected].d_rate);
         ImGui::Text("S: %d", spc.memory.channels[dsp_selected].s_rate);
