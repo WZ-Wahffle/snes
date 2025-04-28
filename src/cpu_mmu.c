@@ -120,6 +120,10 @@ uint8_t mmu_read(uint16_t addr, uint8_t bank, bool log) {
     ASSERT(0, "Tried to read from bank 0x%02x, address 0x%04x", bank, addr);
 }
 
+static uint8_t transfer_patterns[8][4] = {
+    {0, 0, 0, 0}, {0, 1, 0, 1}, {0, 0, 0, 0}, {0, 0, 1, 1},
+    {0, 1, 2, 3}, {0, 1, 0, 1}, {0, 0, 0, 0}, {0, 0, 1, 1}};
+
 void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
     if ((bank < 0x40 || (bank >= 0x80 && bank < 0xc0)) && addr < 0x8000) {
         if (addr < 0x2000) {
@@ -132,17 +136,28 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                 break;
             case 0x2101:
                 ppu.obj_sprite_size = value >> 5;
-                ppu.name_select = (value >> 3) & 0b11;
-                ppu.name_base_address = value & 0b111;
+                ppu.obj_name_select = (value >> 3) & 0b11;
+                ppu.obj_name_base_address = value & 0b111;
                 break;
             case 0x2102:
-                ppu.oam_addr &= ~(0xff << 1);
-                ppu.oam_addr |= (value << 1);
+                ppu.oam_addr = value << 1;
                 break;
             case 0x2103:
-                ppu.oam_addr &= (1 << 9);
-                ppu.oam_addr |= (value & 1) << 9;
+                ppu.oam_table_select = value & 1;
                 ppu.oam_priority_rotation = value & 0x80;
+                break;
+            case 0x2104:
+                if ((ppu.oam_addr & 1) == 0) {
+                    ppu.oam_latch = value;
+                }
+                if (!ppu.oam_table_select && (ppu.oam_addr & 1)) {
+                    ppu.oam_lo[ppu.oam_addr - 1] = ppu.oam_latch;
+                    ppu.oam_lo[ppu.oam_addr] = value;
+                }
+                if (ppu.oam_table_select) {
+                    ppu.oam_hi[ppu.oam_addr - 0x200] = value;
+                }
+                ppu.oam_addr++;
                 break;
             case 0x2105:
                 ppu.bg_mode = value & 0b111;
@@ -387,7 +402,52 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                 break;
             case 0x420b:
                 for (uint8_t i = 0; i < 8; i++)
-                    cpu.memory.dmas[i].dma_enable = value & (1 << i);
+                    if (value & (1 << i)) {
+                        uint32_t byte_count =
+                            cpu.memory.dmas[i].dma_byte_count & 0xffff;
+                        bool direction = cpu.memory.dmas[i].direction;
+                        uint32_t a_addr = cpu.memory.dmas[i].dma_src_addr;
+                        uint16_t b_addr =
+                            0x2100 + cpu.memory.dmas[i].b_bus_addr;
+                        uint8_t transfer_pattern =
+                            cpu.memory.dmas[i].transfer_pattern;
+                        uint8_t addr_inc_mode =
+                            cpu.memory.dmas[i].addr_inc_mode;
+                        if (byte_count == 0)
+                            byte_count = 0x10000;
+                        for (uint32_t j = 0; j < byte_count; j++) {
+                            if (direction) {
+                                uint8_t to_transfer = read_8(
+                                    b_addr + transfer_patterns[transfer_pattern]
+                                                              [j % 4],
+                                    0);
+                                write_8(U24_LOSHORT(a_addr), U24_HIBYTE(a_addr),
+                                        to_transfer);
+                                if (addr_inc_mode == 0)
+                                    a_addr = TO_U24(U24_LOSHORT(a_addr + 1),
+                                                    U24_HIBYTE(a_addr));
+                                if (addr_inc_mode == 2)
+                                    a_addr = TO_U24(U24_LOSHORT(a_addr - 1),
+                                                    U24_HIBYTE(a_addr));
+                            } else {
+                                uint8_t to_transfer = read_8(
+                                    U24_LOSHORT(a_addr), U24_HIBYTE(a_addr));
+                                if (addr_inc_mode == 0)
+                                    a_addr = TO_U24(U24_LOSHORT(a_addr + 1),
+                                                    U24_HIBYTE(a_addr));
+                                if (addr_inc_mode == 2)
+                                    a_addr = TO_U24(U24_LOSHORT(a_addr - 1),
+                                                    U24_HIBYTE(a_addr));
+                                write_8(b_addr +
+                                            transfer_patterns[transfer_pattern]
+                                                             [j % 4],
+                                        0, to_transfer);
+                            }
+                        }
+
+                        cpu.memory.dmas[i].dma_src_addr = a_addr;
+                        cpu.memory.dmas[i].dma_byte_count = 0;
+                    }
                 break;
             case 0x420c:
                 for (uint8_t i = 0; i < 8; i++)

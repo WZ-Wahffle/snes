@@ -83,7 +83,7 @@ void ppu_window(void) {
     ImGui::End();
 }
 
-int32_t vram_page = 0;
+int vram_page = 0;
 void vram_window(void) {
     ImGui::Begin("vram", NULL, ImGuiWindowFlags_HorizontalScrollbar);
     ImGui::InputInt("Page", &vram_page, 1, 16,
@@ -107,6 +107,34 @@ void vram_window(void) {
         }
         ImGui::EndTable();
     }
+    ImGui::End();
+}
+
+int dma_selected = 0;
+void dma_window(void) {
+    ImGui::Begin("dma", NULL, ImGuiWindowFlags_HorizontalScrollbar);
+    ImGui::InputInt("Page", &dma_selected, 1, 1,
+                    ImGuiInputTextFlags_CharsHexadecimal);
+    if (dma_selected < 0)
+        dma_selected = 0;
+    if (dma_selected > 7)
+        dma_selected = 7;
+    ImGui::Text("HDMA: %s",
+                cpu.memory.dmas[dma_selected].hdma_enable ? "true" : "false");
+    ImGui::Text("Direction: %s",
+                cpu.memory.dmas[dma_selected].direction ? "B -> A" : "A -> B");
+    ImGui::Text("Indirect: %s",
+                cpu.memory.dmas[dma_selected].indirect_hdma ? "true" : "false");
+    ImGui::Text("Address adjust mode: %d",
+                cpu.memory.dmas[dma_selected].addr_inc_mode);
+    ImGui::Text("Transfer pattern: %d",
+                cpu.memory.dmas[dma_selected].transfer_pattern);
+    ImGui::Text("B Address: 0x%04x",
+                0x2100 + cpu.memory.dmas[dma_selected].b_bus_addr);
+    ImGui::Text("A Address: 0x%06x",
+                cpu.memory.dmas[dma_selected].dma_src_addr);
+    ImGui::Text("Byte Count: 0x%04x",
+                cpu.memory.dmas[dma_selected].dma_byte_count);
     ImGui::End();
 }
 
@@ -311,6 +339,7 @@ void cpp_imgui_render(void) {
     spc_window();
     spc_ram_window();
     vram_window();
+    dma_window();
     ppu_window();
     cpu_ram_window();
     cpu_rom_window();

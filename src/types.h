@@ -140,7 +140,6 @@ typedef struct {
     memory_map_mode_t mode;
 
     struct dma_t {
-        bool dma_enable;
         bool hdma_enable;
         bool direction;
         bool indirect_hdma;
@@ -231,15 +230,10 @@ typedef struct {
 typedef struct {
     bool force_blanking;
     uint8_t brightness;
-    uint8_t obj_sprite_size;
-    uint8_t name_select;
-    uint8_t name_base_address;
     uint8_t address_increment_amount, address_remapping;
     bool address_increment_mode;
     double remaining_clocks;
     uint16_t beam_x, beam_y;
-    uint16_t oam_addr;
-    bool oam_priority_rotation;
     uint8_t mosaic_size;
 
     uint8_t display_config;
@@ -292,6 +286,15 @@ typedef struct {
     bool cgram_latched;
     uint8_t cgram_latch;
     uint16_t cgram[0x100];
+
+    uint8_t obj_sprite_size;
+    uint8_t obj_name_select;
+    uint8_t obj_name_base_address;
+    uint16_t oam_addr;
+    bool oam_table_select;
+    bool oam_priority_rotation;
+    uint8_t oam_latch;
+    uint8_t oam_lo[0x200], oam_hi[0x20];
 } ppu_t;
 
 #ifdef __cplusplus
