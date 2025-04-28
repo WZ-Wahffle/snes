@@ -314,6 +314,9 @@ void cpu_execute(void) {
     case 0x0a:
         asl(AM_ACC);
         break;
+    case 0x0d:
+        ora(AM_ABS);
+        break;
     case 0x10:
         bpl(AM_PC_REL);
         break;
@@ -364,6 +367,9 @@ void cpu_execute(void) {
         break;
     case 0x48:
         pha(AM_STK);
+        break;
+    case 0x49:
+        eor(AM_IMM);
         break;
     case 0x4a:
         lsr(AM_ACC);
@@ -416,6 +422,9 @@ void cpu_execute(void) {
     case 0x78:
         sei(AM_IMP);
         break;
+    case 0x79:
+        adc(AM_ABSY);
+        break;
     case 0x7a:
         ply(AM_STK);
         break;
@@ -430,6 +439,9 @@ void cpu_execute(void) {
         break;
     case 0x86:
         stx(AM_DIR);
+        break;
+    case 0x87:
+        sta(AM_IND_DIR_L);
         break;
     case 0x88:
         dey(AM_IMP);
@@ -542,6 +554,9 @@ void cpu_execute(void) {
     case 0xbe:
         ldx(AM_ABSY);
         break;
+    case 0xbf:
+        lda(AM_ABSX_L);
+        break;
     case 0xc0:
         cpy(AM_IMM);
         break;
@@ -571,6 +586,9 @@ void cpu_execute(void) {
         break;
     case 0xd0:
         bne(AM_PC_REL);
+        break;
+    case 0xd9:
+        cmp(AM_ABSY);
         break;
     case 0xda:
         phx(AM_STK);

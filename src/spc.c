@@ -199,11 +199,17 @@ void spc_execute(void) {
         timer_timer -= 128;
     }
     switch (opcode) {
+    case 0x03:
+        spc_bbs0(SM_DIR_PAGE_BIT_REL);
+        break;
     case 0x0a:
         spc_or1(SM_ABS_BOOL_BIT);
         break;
     case 0x10:
         spc_bpl(SM_REL);
+        break;
+    case 0x1a:
+        spc_dew(SM_DIR_PAGE);
         break;
     case 0x1c:
         spc_asl(SM_ACC);

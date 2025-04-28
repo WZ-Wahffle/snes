@@ -192,6 +192,26 @@ OP(bcc) {
     }
 }
 
+#define OP_BBS(x)                                                              \
+    OP(bbs##x) {                                                                  \
+        LEGALADDRMODES(SM_DIR_PAGE_BIT_REL);                                   \
+        uint8_t val = spc_resolve_read(SM_DIR_PAGE);                           \
+        if (val & (1 << x)) {                                                  \
+            spc.pc += (int8_t)spc_next_8();                                    \
+        } else {                                                               \
+            spc.pc++;                                                          \
+        }                                                                      \
+    }
+OP_BBS(0);
+OP_BBS(1);
+OP_BBS(2);
+OP_BBS(3);
+OP_BBS(4);
+OP_BBS(5);
+OP_BBS(6);
+OP_BBS(7);
+#undef OP_BBS
+
 OP(cbne) {
     LEGALADDRMODES(SM_DIR_PAGE | SM_DIR_PAGEX);
     uint8_t operand = spc_resolve_read(mode);
@@ -324,6 +344,15 @@ OP(inc) {
         spc_set_status_bit(STATUS_NEGATIVE, val & 0x80);
         spc_set_status_bit(STATUS_ZERO, val == 0);
     }
+}
+
+OP(dew) {
+    LEGALADDRMODES(SM_DIR_PAGE);
+    uint16_t addr = spc_resolve_addr(mode);
+    uint16_t val = spc_read_16(addr) - 1;
+    spc_set_status_bit(STATUS_ZERO, val == 0);
+    spc_set_status_bit(STATUS_NEGATIVE, val & 0x8000);
+    spc_write_16(addr, val);
 }
 
 OP(adc) {
