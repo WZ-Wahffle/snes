@@ -106,7 +106,7 @@ int main(int argc, char **argv) {
         ASSERT(0, "Cart not identified, hash value is 0x%x", hash_value);
     }
 
-    uint8_t *header;
+    uint8_t *header = NULL;
     switch (mode) {
     case LOROM:
         header = file_to_hash + 0x7fc0;
@@ -117,6 +117,8 @@ int main(int argc, char **argv) {
     case EXHIROM:
         header = file_to_hash + 0x40ffc0;
         break;
+        default:
+        UNREACHABLE_SWITCH(mode);
     }
 
     log_message(LOG_LEVEL_INFO, "Cartridge type: %d", header[0x16]);

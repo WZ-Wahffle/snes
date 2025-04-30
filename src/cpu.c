@@ -262,7 +262,11 @@ uint16_t resolve_read8(addressing_mode_t mode) {
     case AM_IMM:
         return next_8();
     case AM_ABS:
-    case AM_ABSX: {
+    case AM_ABSX:
+    case AM_ABSY:
+    case AM_ABSX_L:
+    case AM_DIR:
+    case AM_ZBKX_DIR: {
         uint32_t addr = resolve_addr(mode);
         return read_8(U24_LOSHORT(addr), U24_HIBYTE(addr));
     }
@@ -272,6 +276,7 @@ uint16_t resolve_read8(addressing_mode_t mode) {
 }
 
 void cpu_reset(void) {
+    cpu.speed = 1;
     cpu.pc = read_16(0xfffc, 0);
     cpu.emulation_mode = true;
     cpu.p = 0b110000;
@@ -294,6 +299,9 @@ static uint8_t cpu_cycle_counts[] = {
 void cpu_execute(void) {
     uint8_t opcode = next_8();
     log_message(LOG_LEVEL_VERBOSE, "CPU fetched opcode 0x%02x", opcode);
+    cpu.opcode_history[cpu.history_idx] = opcode;
+    cpu.pc_history[cpu.history_idx] = TO_U24(cpu.pc, cpu.pbr);
+    cpu.history_idx++;
     // TODO: disambiguate cpu cycles taking 6, 8 or 12 clock cycles
 
     // remaining clocks increments at 341 * 262 * 60 * 4 = 21.44MHz.
@@ -302,8 +310,14 @@ void cpu_execute(void) {
     // factor of 6
     cpu.remaining_clocks -= 6 * cpu_cycle_counts[opcode];
     switch (opcode) {
+    case 0x04:
+        tsb(AM_DIR);
+        break;
     case 0x05:
         ora(AM_DIR);
+        break;
+    case 0x06:
+        asl(AM_DIR);
         break;
     case 0x07:
         ora(AM_IND_DIR_L);
@@ -311,17 +325,29 @@ void cpu_execute(void) {
     case 0x08:
         php(AM_STK);
         break;
+    case 0x09:
+        ora(AM_IMM);
+        break;
     case 0x0a:
         asl(AM_ACC);
         break;
     case 0x0d:
         ora(AM_ABS);
         break;
+    case 0x0e:
+        asl(AM_ABS);
+        break;
     case 0x10:
         bpl(AM_PC_REL);
         break;
+    case 0x14:
+        trb(AM_DIR);
+        break;
     case 0x18:
         clc(AM_IMP);
+        break;
+    case 0x19:
+        ora(AM_ABSY);
         break;
     case 0x1a:
         inc(AM_ACC);
@@ -332,14 +358,26 @@ void cpu_execute(void) {
     case 0x1d:
         ora(AM_ABSX);
         break;
+    case 0x1e:
+        asl(AM_ABSX);
+        break;
+    case 0x1f:
+        ora(AM_ABSX_L);
+        break;
     case 0x20:
         jsr(AM_ABS);
         break;
     case 0x22:
         jsl(AM_ABS_L);
         break;
+    case 0x24:
+        bit(AM_DIR);
+        break;
     case 0x25:
         and_(AM_DIR);
+        break;
+    case 0x26:
+        rol(AM_DIR);
         break;
     case 0x28:
         plp(AM_STK);
@@ -350,6 +388,9 @@ void cpu_execute(void) {
     case 0x2a:
         rol(AM_ACC);
         break;
+    case 0x2c:
+        bit(AM_ABS);
+        break;
     case 0x2d:
         and_(AM_ABS);
         break;
@@ -359,11 +400,26 @@ void cpu_execute(void) {
     case 0x38:
         sec(AM_IMP);
         break;
+    case 0x39:
+        and_(AM_ABSY);
+        break;
     case 0x3a:
         dec(AM_ACC);
         break;
+    case 0x3d:
+        and_(AM_ABSX);
+        break;
+    case 0x3f:
+        and_(AM_ABSX_L);
+        break;
     case 0x40:
         rti(AM_STK);
+        break;
+    case 0x45:
+        eor(AM_DIR);
+        break;
+    case 0x46:
+        lsr(AM_DIR);
         break;
     case 0x48:
         pha(AM_STK);
@@ -383,8 +439,20 @@ void cpu_execute(void) {
     case 0x4d:
         eor(AM_ABS);
         break;
+    case 0x50:
+        bvc(AM_PC_REL);
+        break;
+    case 0x54:
+        mvn(AM_BLK);
+        break;
+    case 0x55:
+        eor(AM_ZBKX_DIR);
+        break;
     case 0x58:
         cli(AM_IMP);
+        break;
+    case 0x59:
+        eor(AM_ABSY);
         break;
     case 0x5a:
         phy(AM_STK);
@@ -392,8 +460,20 @@ void cpu_execute(void) {
     case 0x5b:
         tcd(AM_IMP);
         break;
+    case 0x5c:
+        jml(AM_ABS_L);
+        break;
+    case 0x5d:
+        eor(AM_ABSX);
+        break;
+    case 0x5e:
+        lsr(AM_ABSX);
+        break;
     case 0x60:
         rts(AM_IMP);
+        break;
+    case 0x62:
+        per(AM_PC_REL_L);
         break;
     case 0x64:
         stz(AM_DIR);
@@ -407,6 +487,9 @@ void cpu_execute(void) {
     case 0x69:
         adc(AM_IMM);
         break;
+    case 0x6a:
+        ror(AM_ACC);
+        break;
     case 0x6b:
         rtl(AM_IMP);
         break;
@@ -419,6 +502,9 @@ void cpu_execute(void) {
     case 0x74:
         stz(AM_ZBKX_DIR);
         break;
+    case 0x75:
+        adc(AM_ZBKX_DIR);
+        break;
     case 0x78:
         sei(AM_IMP);
         break;
@@ -427,6 +513,15 @@ void cpu_execute(void) {
         break;
     case 0x7a:
         ply(AM_STK);
+        break;
+    case 0x7d:
+        adc(AM_ABSX);
+        break;
+    case 0x7e:
+        ror(AM_ABSX);
+        break;
+    case 0x7f:
+        adc(AM_ABSX_L);
         break;
     case 0x80:
         bra(AM_PC_REL);
@@ -466,6 +561,12 @@ void cpu_execute(void) {
         break;
     case 0x90:
         bcc(AM_PC_REL);
+        break;
+    case 0x94:
+        sty(AM_ZBKX_DIR);
+        break;
+    case 0x95:
+        sta(AM_ZBKX_DIR);
         break;
     case 0x97:
         sta(AM_INDY_DIR_L);
@@ -530,11 +631,26 @@ void cpu_execute(void) {
     case 0xae:
         ldx(AM_ABS);
         break;
+    case 0xaf:
+        lda(AM_ABS_L);
+        break;
     case 0xb0:
         bcs(AM_PC_REL);
         break;
+    case 0xb1:
+        lda(AM_INDY_DIR);
+        break;
     case 0xb2:
         lda(AM_IND_DIR);
+        break;
+    case 0xb4:
+        ldy(AM_ZBKX_DIR);
+        break;
+    case 0xb5:
+        lda(AM_ZBKX_DIR);
+        break;
+    case 0xb6:
+        ldx(AM_ZBKY_DIR);
         break;
     case 0xb7:
         lda(AM_INDY_DIR_L);
@@ -563,6 +679,12 @@ void cpu_execute(void) {
     case 0xc2:
         rep(AM_IMM);
         break;
+    case 0xc4:
+        cpy(AM_DIR);
+        break;
+    case 0xc5:
+        cmp(AM_DIR);
+        break;
     case 0xc6:
         dec(AM_DIR);
         break;
@@ -587,6 +709,15 @@ void cpu_execute(void) {
     case 0xd0:
         bne(AM_PC_REL);
         break;
+    case 0xd5:
+        cmp(AM_ZBKX_DIR);
+        break;
+    case 0xd6:
+        dec(AM_ZBKX_DIR);
+        break;
+    case 0xd7:
+        cmp(AM_INDY_DIR_L);
+        break;
     case 0xd9:
         cmp(AM_ABSY);
         break;
@@ -596,11 +727,26 @@ void cpu_execute(void) {
     case 0xdc:
         jml(AM_IND);
         break;
+    case 0xdd:
+        cmp(AM_ABSX);
+        break;
+    case 0xde:
+        dec(AM_ABSX);
+        break;
+    case 0xdf:
+        cmp(AM_ABSX_L);
+        break;
     case 0xe0:
         cpx(AM_IMM);
         break;
     case 0xe2:
         sep(AM_IMM);
+        break;
+    case 0xe4:
+        cpx(AM_DIR);
+        break;
+    case 0xe5:
+        sbc(AM_DIR);
         break;
     case 0xe6:
         inc(AM_DIR);
@@ -611,11 +757,17 @@ void cpu_execute(void) {
     case 0xe9:
         sbc(AM_IMM);
         break;
+    case 0xea:
+        // this page intentionally left blank
+        break;
     case 0xeb:
         xba(AM_IMP);
         break;
     case 0xec:
         cpx(AM_ABS);
+        break;
+    case 0xed:
+        sbc(AM_ABS);
         break;
     case 0xee:
         inc(AM_ABS);
@@ -623,11 +775,26 @@ void cpu_execute(void) {
     case 0xf0:
         beq(AM_PC_REL);
         break;
+    case 0xf5:
+        sbc(AM_ZBKX_DIR);
+        break;
+    case 0xf6:
+        inc(AM_ZBKX_DIR);
+        break;
+    case 0xf9:
+        sbc(AM_ABSY);
+        break;
     case 0xfa:
         plx(AM_STK);
         break;
     case 0xfb:
         xce(AM_ACC);
+        break;
+    case 0xfd:
+        sbc(AM_ABSX);
+        break;
+    case 0xfe:
+        inc(AM_ABSX);
         break;
     default:
         UNREACHABLE_SWITCH(opcode);

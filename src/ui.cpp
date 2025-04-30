@@ -21,6 +21,14 @@ void cpu_window(void) {
     ImGui::SameLine();
     if (ImGui::Button("Step"))
         cpu.state = STATE_STEPPED;
+    ImGui::SameLine();
+    if (ImGui::Button("Dump State")) {
+        for (uint16_t i = cpu.history_idx; i != cpu.history_idx - 1; i++) {
+            printf("0x%06x: 0x%02x\n", cpu.pc_history[i],
+                   cpu.opcode_history[i]);
+        }
+    }
+    ImGui::Text("Speed: %.4lfx", cpu.speed);
     ImGui::NewLine();
     ImGui::Text("Mode: %s", cpu.emulation_mode ? "emulation" : "native");
     ImGui::Text("C: 0x%04x, %s", cpu.c,
@@ -80,6 +88,8 @@ void ppu_window(void) {
                 ppu.bg_config[bg_selected].tiledata_addr);
     ImGui::Text("Tile Map Addr: 0x%02x",
                 ppu.bg_config[bg_selected].tilemap_addr);
+    ImGui::Text("h: %d, v: %d", ppu.bg_config[bg_selected].double_h_tilemap + 1,
+                ppu.bg_config[bg_selected].double_v_tilemap + 1);
     ImGui::End();
 }
 
@@ -103,6 +113,35 @@ void vram_window(void) {
                 }
             }
             if (i != 15)
+                ImGui::TableNextRow();
+        }
+        ImGui::EndTable();
+    }
+    ImGui::End();
+}
+
+void oam_lo_window(void) {
+    ImGui::Begin("oamlo", NULL, ImGuiWindowFlags_HorizontalScrollbar);
+    if (ImGui::BeginTable("##oamlo", 4,
+                          ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
+        ImGui::TableSetupColumn("X", ImGuiTableColumnFlags_WidthFixed);
+        ImGui::TableSetupColumn("Y", ImGuiTableColumnFlags_WidthFixed);
+        ImGui::TableSetupColumn("TIdx", ImGuiTableColumnFlags_WidthFixed);
+        ImGui::TableSetupColumn("Pall", ImGuiTableColumnFlags_WidthFixed);
+        ImGui::TableHeadersRow();
+        ImGui::TableNextRow();
+        for (uint16_t i = 0; i < 128; i++) {
+            ImGui::TableNextColumn();
+            ImGui::Text("%4d", ppu.oam[i].x);
+            ImGui::TableNextColumn();
+            ImGui::Text("%4d", ppu.oam[i].y);
+            ImGui::TableNextColumn();
+            ImGui::Text("0x%03x", ppu.oam[i].tile_idx |
+                                      (ppu.oam[i].use_second_sprite_page << 8));
+            ImGui::TableNextColumn();
+            ImGui::Text("0x%02x", ppu.oam[i].palette);
+
+            if (i != 127)
                 ImGui::TableNextRow();
         }
         ImGui::EndTable();
@@ -341,6 +380,7 @@ void cpp_imgui_render(void) {
     vram_window();
     dma_window();
     ppu_window();
+    oam_lo_window();
     cpu_ram_window();
     cpu_rom_window();
     cpu_window();

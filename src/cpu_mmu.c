@@ -91,6 +91,24 @@ uint8_t mmu_read(uint16_t addr, uint8_t bank, bool log) {
             case 0x2142:
             case 0x2143:
                 return spc.memory.ram[0xf4 + (addr - 0x2140)];
+            case 0x4016: {
+                uint8_t ret =
+                    ((cpu.memory.joy1l >> cpu.memory.joy1_shift_idx) & 1) |
+                    (((cpu.memory.joy1h >> cpu.memory.joy1_shift_idx) & 1)
+                     << 1);
+                cpu.memory.joy1_shift_idx++;
+                cpu.memory.joy1_shift_idx %= 8;
+                return ret;
+            }
+            case 0x4017: {
+                uint8_t ret =
+                    ((cpu.memory.joy2l >> cpu.memory.joy2_shift_idx) & 1) |
+                    (((cpu.memory.joy2h >> cpu.memory.joy2_shift_idx) & 1)
+                     << 1);
+                cpu.memory.joy2_shift_idx++;
+                cpu.memory.joy2_shift_idx %= 8;
+                return ret;
+            }
             case 0x4210: {
                 bool ret = cpu.memory.vblank_has_occurred;
                 cpu.memory.vblank_has_occurred = false;
@@ -101,6 +119,32 @@ uint8_t mmu_read(uint16_t addr, uint8_t bank, bool log) {
                 cpu.memory.timer_has_occurred = false;
                 return ret << 7;
             }
+            case 0x4214:
+                if (cpu.memory.divisor == 0)
+                    return 0xff;
+                return U16_LOBYTE(cpu.memory.dividend / cpu.memory.divisor);
+            case 0x4215:
+                if (cpu.memory.divisor == 0)
+                    return 0xff;
+                return U16_HIBYTE(cpu.memory.dividend / cpu.memory.divisor);
+            case 0x4216:
+                if (cpu.memory.doing_div) {
+                    if (cpu.memory.divisor)
+                        return cpu.memory.dividend;
+                    return U16_LOBYTE(cpu.memory.dividend % cpu.memory.divisor);
+                } else {
+                    return U16_LOBYTE(cpu.memory.mul_factor_a *
+                                      cpu.memory.mul_factor_b);
+                }
+            case 0x4217:
+                if (cpu.memory.doing_div) {
+                    if (cpu.memory.divisor)
+                        return cpu.memory.dividend;
+                    return U16_HIBYTE(cpu.memory.dividend % cpu.memory.divisor);
+                } else {
+                    return U16_HIBYTE(cpu.memory.mul_factor_a *
+                                      cpu.memory.mul_factor_b);
+                }
             case 0x4218:
                 return U16_LOBYTE(cpu.memory.joy1l);
             case 0x4219:
@@ -151,13 +195,35 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                     ppu.oam_latch = value;
                 }
                 if (!ppu.oam_table_select && (ppu.oam_addr & 1)) {
-                    ppu.oam_lo[ppu.oam_addr - 1] = ppu.oam_latch;
-                    ppu.oam_lo[ppu.oam_addr] = value;
+                    uint8_t oam_idx = ppu.oam_addr / 4;
+                    if(ppu.oam_addr % 4 == 1) {
+                        ppu.oam[oam_idx].x &= 0xff00;
+                        ppu.oam[oam_idx].x |= ppu.oam_latch;
+                        ppu.oam[oam_idx].y = value;
+                    }
+                    if(ppu.oam_addr % 4 == 3) {
+                        ppu.oam[oam_idx].tile_idx = ppu.oam_latch;
+                        ppu.oam[oam_idx].use_second_sprite_page = value & 1;
+                        ppu.oam[oam_idx].palette = (value >> 1) & 0b111;
+                        ppu.oam[oam_idx].priority = (value >> 4) & 0b11;
+                        ppu.oam[oam_idx].flip_h = value & 0x40;
+                        ppu.oam[oam_idx].flip_v = value & 0x80;
+                    }
+                    // ppu.oam_lo[ppu.oam_addr - 1] = ppu.oam_latch;
+                    // ppu.oam_lo[ppu.oam_addr] = value;
                 }
                 if (ppu.oam_table_select) {
-                    ppu.oam_hi[ppu.oam_addr - 0x200] = value;
+                    // ppu.oam_hi[ppu.oam_addr - 0x200] = value;
+                    for (uint8_t i = 0; i < 4; i++) {
+                        ppu.oam[(ppu.oam_addr % 0x20) * 4 + i].x &= 0xff;
+                        ppu.oam[(ppu.oam_addr % 0x20) * 4 + i].x |=
+                            ((value >> (i * 2)) & 1) << 8;
+                        ppu.oam[(ppu.oam_addr % 0x20) * 4 + i]
+                            .use_second_size = (value >> (i * 2 + 1)) & 1;
+                    }
                 }
                 ppu.oam_addr++;
+                ppu.oam_addr %= 0x200;
                 break;
             case 0x2105:
                 ppu.bg_mode = value & 0b111;
@@ -399,6 +465,41 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                 cpu.memory.joy_auto_read = value & 1;
                 cpu.vblank_nmi_enable = value & 0x80;
                 cpu.timer_irq = (value >> 4) & 0b11;
+                break;
+            case 0x4202:
+                cpu.memory.mul_factor_a = value;
+                break;
+            case 0x4203:
+                cpu.memory.mul_factor_b = value;
+                cpu.memory.doing_div = false;
+                break;
+            case 0x4204:
+                cpu.memory.dividend &= 0xff00;
+                cpu.memory.dividend |= value;
+                break;
+            case 0x4205:
+                cpu.memory.dividend &= 0xff;
+                cpu.memory.dividend |= value << 8;
+                break;
+            case 0x4206:
+                cpu.memory.divisor = value;
+                cpu.memory.doing_div = true;
+                break;
+            case 0x4207:
+                ppu.h_timer_target &= 0x100;
+                ppu.h_timer_target |= value;
+                break;
+            case 0x4208:
+                ppu.h_timer_target &= 0xff;
+                ppu.h_timer_target |= (value & 1) << 8;
+                break;
+            case 0x4209:
+                ppu.v_timer_target &= 0x100;
+                ppu.v_timer_target |= value;
+                break;
+            case 0x420a:
+                ppu.v_timer_target &= 0xff;
+                ppu.v_timer_target |= (value & 1) << 8;
                 break;
             case 0x420b:
                 for (uint8_t i = 0; i < 8; i++)

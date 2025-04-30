@@ -28,6 +28,13 @@ void try_step_cpu(void) {
             push_16(cpu.pc);
             push_8(cpu.p);
             cpu.pc = read_16(cpu.emulation_mode ? 0xfffa : 0xffea, 0);
+        } else if (!get_status_bit(STATUS_IRQOFF) && cpu.irq) {
+            if (!cpu.emulation_mode)
+                push_8(cpu.pbr);
+            push_16(cpu.pc);
+            push_8(cpu.p);
+            cpu.pc = read_16(cpu.emulation_mode ? 0xfffe : 0xffee, 0);
+            cpu.irq = false;
         }
         prev_vblank = curr_vblank;
     }
@@ -38,6 +45,23 @@ void try_step_spc(void) {
         spc_execute();
         if (spc.breakpoint_valid && spc.pc == spc.breakpoint) {
             cpu.state = STATE_STOPPED;
+        }
+    }
+}
+
+void draw_obj(uint16_t x, uint16_t y) {
+    static uint8_t size_lut[8][4] = {
+        {8, 8, 16, 16},   {8, 8, 32, 32},   {8, 8, 64, 64},   {16, 16, 32, 32},
+        {16, 16, 64, 64}, {32, 32, 64, 64}, {16, 32, 32, 64}, {16, 32, 32, 32}};
+    for (int8_t sprite_idx = 127; sprite_idx >= 0; sprite_idx--) {
+        int16_t sp_x = ppu.oam[sprite_idx].x;
+        int16_t sp_y = ppu.oam[sprite_idx].y;
+        uint8_t sp_w = size_lut[ppu.obj_sprite_size]
+                               [ppu.oam[sprite_idx].use_second_size * 2];
+        uint8_t sp_h = size_lut[ppu.obj_sprite_size]
+                               [ppu.oam[sprite_idx].use_second_size * 2 + 1];
+        if (IN_INTERVAL(x, sp_x, sp_x + sp_w) &&
+            IN_INTERVAL(y, sp_y, sp_y + sp_h)) {
         }
     }
 }
@@ -55,6 +79,16 @@ void try_step_ppu(void) {
             }
         }
 
+        if (cpu.timer_irq) {
+            if ((cpu.timer_irq == 1 && ppu.beam_x == ppu.h_timer_target) ||
+                (cpu.timer_irq == 2 && ppu.beam_y == ppu.v_timer_target &&
+                 ppu.beam_x == 0) ||
+                (cpu.timer_irq == 3 && ppu.beam_y == ppu.v_timer_target &&
+                 ppu.beam_x == ppu.h_timer_target)) {
+                cpu.irq = true;
+            }
+        }
+
         if (ppu.beam_x == 0 && ppu.beam_y == 225)
             cpu.memory.vblank_has_occurred = true;
         if (ppu.beam_x == 339 && ppu.beam_y == 261)
@@ -62,9 +96,11 @@ void try_step_ppu(void) {
 
         if (ppu.beam_x > 21 && ppu.beam_x < 278 && ppu.beam_y > 0 &&
             ppu.beam_y < 225) {
-            // TODO: proper rendering I suppose
 
-            set_pixel(ppu.beam_x - 22, ppu.beam_y - 1, 0xff000000);
+            uint16_t drawing_x = ppu.beam_x - 22;
+            uint16_t drawing_y = ppu.beam_y - 1;
+
+            draw_obj(drawing_x, drawing_y);
         }
     }
 }
@@ -80,13 +116,16 @@ void ui(void) {
 
     bool view_debug_ui = false;
 
+    ppu.v_timer_target = 0x1ff;
+    ppu.h_timer_target = 0x1ff;
+
     while (!WindowShouldClose()) {
         BeginDrawing();
         ClearBackground(BLACK);
 
         // cpu.remaining_clocks += 357368;
         // try_step_cpu();
-        for (uint32_t i = 0; i < 341 * 262; i++) {
+        for (uint32_t i = 0; i < 341 * 262 * cpu.speed; i++) {
             switch (cpu.state) {
             case STATE_STOPPED:
                 // this page intentionally left blank
@@ -158,10 +197,19 @@ void ui(void) {
             cpu.state = STATE_RUNNING;
         }
 
+        if (IsKeyPressed(KEY_END)) {
+            cpu.speed *= 2;
+        }
+
+        if (IsKeyPressed(KEY_HOME)) {
+            cpu.speed /= 2;
+        }
+
         if (view_debug_ui) {
             cpp_imgui_render();
         }
-        // view_debug_ui = true;
+
+        DrawFPS(0, 0);
 
         EndDrawing();
     }

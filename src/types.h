@@ -125,6 +125,8 @@ typedef enum { STATE_STOPPED, STATE_STEPPED, STATE_RUNNING } emu_state_t;
 
 typedef enum { R_C, R_X, R_Y, R_S, R_D } r_t;
 
+typedef enum { BPP_2 = 2, BPP_4 = 4, BPP_8 = 8 } color_depth_t;
+
 typedef struct {
     const char *name;
     const uint32_t hash;
@@ -157,9 +159,15 @@ typedef struct {
     bool vblank_has_occurred;
     bool timer_has_occurred;
 
+    uint8_t mul_factor_a, mul_factor_b;
+    uint16_t dividend;
+    uint8_t divisor;
+    bool doing_div;
+
     bool joy_auto_read;
     uint16_t joy1l, joy1h;
     uint16_t joy2l, joy2h;
+    uint8_t joy1_shift_idx, joy2_shift_idx;
 } cpu_mmu_t;
 
 typedef struct {
@@ -168,10 +176,16 @@ typedef struct {
     bool vblank_nmi_enable;
     uint8_t timer_irq;
     bool emulation_mode;
+    bool irq;
 
     emu_state_t state;
     bool breakpoint_valid;
     uint32_t breakpoint;
+    double speed;
+
+    uint8_t opcode_history[0x10000];
+    uint32_t pc_history[0x10000];
+    uint16_t history_idx;
 
     uint16_t pc, c, x, y, d, s;
     uint8_t dbr, pbr, p;
@@ -235,9 +249,10 @@ typedef struct {
     double remaining_clocks;
     uint16_t beam_x, beam_y;
     uint8_t mosaic_size;
+    uint16_t h_timer_target, v_timer_target;
 
     uint8_t display_config;
-    struct background_props_t {
+    struct {
         bool large_characters;
         bool enable_mosaic;
         bool double_h_tilemap, double_v_tilemap;
@@ -294,7 +309,16 @@ typedef struct {
     bool oam_table_select;
     bool oam_priority_rotation;
     uint8_t oam_latch;
-    uint8_t oam_lo[0x200], oam_hi[0x20];
+    struct {
+        int16_t x;
+        int16_t y;
+        uint8_t tile_idx;
+        bool use_second_sprite_page;
+        bool use_second_size;
+        uint8_t palette;
+        uint8_t priority;
+        bool flip_h, flip_v;
+    } oam[128];
 } ppu_t;
 
 #ifdef __cplusplus
@@ -320,6 +344,8 @@ EXTERNC uint8_t read_8_no_log(uint16_t addr, uint8_t bank);
 EXTERNC uint16_t read_16(uint16_t addr, uint8_t bank);
 EXTERNC uint32_t read_24(uint16_t addr, uint8_t bank);
 EXTERNC uint16_t read_r(r_t reg);
+EXTERNC uint8_t next_8(void);
+EXTERNC uint16_t next_16(void);
 EXTERNC void write_8(uint16_t addr, uint8_t bank, uint8_t val);
 EXTERNC void write_16(uint16_t addr, uint8_t bank, uint16_t val);
 EXTERNC void write_r(r_t reg, uint16_t val);
