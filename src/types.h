@@ -42,6 +42,7 @@ static void log_message(log_level_t level, char *message, ...);
 #define U16_HIBYTE(val) (((val) >> 8) & 0xff)
 #define U24_LOSHORT(val) ((val) & 0xffff)
 #define U24_HIBYTE(val) (((val) >> 16) & 0xff)
+#define R5G5B5_TO_R8G8B8A8(val) ()
 #define IN_INTERVAL(val, min, max) ((val) >= (min) && (val) < (max))
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
@@ -306,7 +307,6 @@ typedef struct {
     uint8_t obj_name_select;
     uint8_t obj_name_base_address;
     uint16_t oam_addr;
-    bool oam_table_select;
     bool oam_priority_rotation;
     uint8_t oam_latch;
     struct {
@@ -318,6 +318,7 @@ typedef struct {
         uint8_t palette;
         uint8_t priority;
         bool flip_h, flip_v;
+        bool draw_this_line;
     } oam[128];
 } ppu_t;
 

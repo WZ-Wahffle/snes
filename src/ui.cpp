@@ -121,14 +121,19 @@ void vram_window(void) {
 }
 
 void oam_lo_window(void) {
-    ImGui::Begin("oamlo", NULL, ImGuiWindowFlags_HorizontalScrollbar);
-    if (ImGui::BeginTable("##oamlo", 4,
+    ImGui::Begin("oam", NULL, ImGuiWindowFlags_HorizontalScrollbar);
+    ImGui::Text("DEF Nametable: 0x%04x", ppu.obj_name_base_address << 14);
+    ImGui::Text("ALT Nametable: 0x%04x", (ppu.obj_name_base_address << 14) + ((ppu.obj_name_select + 1) << 12));
+    ImGui::Text("Sprite size index: %d", ppu.obj_sprite_size);
+    if (ImGui::BeginTable("##oam", 5,
                           ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
         ImGui::TableSetupColumn("X", ImGuiTableColumnFlags_WidthFixed);
         ImGui::TableSetupColumn("Y", ImGuiTableColumnFlags_WidthFixed);
         ImGui::TableSetupColumn("TIdx", ImGuiTableColumnFlags_WidthFixed);
         ImGui::TableSetupColumn("Pall", ImGuiTableColumnFlags_WidthFixed);
+        ImGui::TableSetupColumn("ASize", ImGuiTableColumnFlags_WidthFixed);
         ImGui::TableHeadersRow();
+
         ImGui::TableNextRow();
         for (uint16_t i = 0; i < 128; i++) {
             ImGui::TableNextColumn();
@@ -140,9 +145,12 @@ void oam_lo_window(void) {
                                       (ppu.oam[i].use_second_sprite_page << 8));
             ImGui::TableNextColumn();
             ImGui::Text("0x%02x", ppu.oam[i].palette);
+            ImGui::TableNextColumn();
+            ImGui::Text("%c", ppu.oam[i].use_second_size ? 'X' : ' ');
 
-            if (i != 127)
+            if (i != 127) {
                 ImGui::TableNextRow();
+            }
         }
         ImGui::EndTable();
     }

@@ -184,24 +184,26 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                 ppu.obj_name_base_address = value & 0b111;
                 break;
             case 0x2102:
-                ppu.oam_addr = value << 1;
+                ppu.oam_addr &= ~0x1ff;
+                ppu.oam_addr |= (value << 1);
                 break;
             case 0x2103:
-                ppu.oam_table_select = value & 1;
+                ppu.oam_addr &= ~0x200;
+                ppu.oam_addr |= (value & 1) << 9;
                 ppu.oam_priority_rotation = value & 0x80;
                 break;
             case 0x2104:
                 if ((ppu.oam_addr & 1) == 0) {
                     ppu.oam_latch = value;
                 }
-                if (!ppu.oam_table_select && (ppu.oam_addr & 1)) {
+                if (ppu.oam_addr < 0x200 && (ppu.oam_addr & 1)) {
                     uint8_t oam_idx = ppu.oam_addr / 4;
-                    if(ppu.oam_addr % 4 == 1) {
+                    if (ppu.oam_addr % 4 == 1) {
                         ppu.oam[oam_idx].x &= 0xff00;
                         ppu.oam[oam_idx].x |= ppu.oam_latch;
                         ppu.oam[oam_idx].y = value;
                     }
-                    if(ppu.oam_addr % 4 == 3) {
+                    if (ppu.oam_addr % 4 == 3) {
                         ppu.oam[oam_idx].tile_idx = ppu.oam_latch;
                         ppu.oam[oam_idx].use_second_sprite_page = value & 1;
                         ppu.oam[oam_idx].palette = (value >> 1) & 0b111;
@@ -209,21 +211,17 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                         ppu.oam[oam_idx].flip_h = value & 0x40;
                         ppu.oam[oam_idx].flip_v = value & 0x80;
                     }
-                    // ppu.oam_lo[ppu.oam_addr - 1] = ppu.oam_latch;
-                    // ppu.oam_lo[ppu.oam_addr] = value;
                 }
-                if (ppu.oam_table_select) {
-                    // ppu.oam_hi[ppu.oam_addr - 0x200] = value;
+                if (ppu.oam_addr >= 0x200) {
                     for (uint8_t i = 0; i < 4; i++) {
                         ppu.oam[(ppu.oam_addr % 0x20) * 4 + i].x &= 0xff;
                         ppu.oam[(ppu.oam_addr % 0x20) * 4 + i].x |=
                             ((value >> (i * 2)) & 1) << 8;
-                        ppu.oam[(ppu.oam_addr % 0x20) * 4 + i]
-                            .use_second_size = (value >> (i * 2 + 1)) & 1;
+                        ppu.oam[(ppu.oam_addr % 0x20) * 4 + i].use_second_size =
+                            (value >> (i * 2 + 1)) & 1;
                     }
                 }
                 ppu.oam_addr++;
-                ppu.oam_addr %= 0x200;
                 break;
             case 0x2105:
                 ppu.bg_mode = value & 0b111;

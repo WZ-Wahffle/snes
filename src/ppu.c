@@ -7,7 +7,7 @@ extern cpu_t cpu;
 extern ppu_t ppu;
 extern spc_t spc;
 
-void *framebuffer[WINDOW_WIDTH * WINDOW_HEIGHT * 4] = {0};
+uint8_t framebuffer[WINDOW_WIDTH * WINDOW_HEIGHT * 4] = {0};
 
 void set_pixel(uint16_t x, uint16_t y, uint32_t color) {
     ((uint32_t *)framebuffer)[x + WINDOW_WIDTH * y] = color;
@@ -49,19 +49,80 @@ void try_step_spc(void) {
     }
 }
 
-void draw_obj(uint16_t x, uint16_t y) {
+uint32_t r5g5b5_to_r8g8b8a8(uint16_t in) {
+    uint32_t ret = 0xff000000;
+    ret |= ((in >> 0) & 0x1f) << 3;
+    ret |= ((in >> 5) & 0x1f) << 11;
+    ret |= ((in >> 10) & 0x1f) << 19;
+    return ret;
+}
+
+void draw_obj(uint16_t y) {
     static uint8_t size_lut[8][4] = {
         {8, 8, 16, 16},   {8, 8, 32, 32},   {8, 8, 64, 64},   {16, 16, 32, 32},
         {16, 16, 64, 64}, {32, 32, 64, 64}, {16, 32, 32, 64}, {16, 32, 32, 32}};
-    for (int8_t sprite_idx = 127; sprite_idx >= 0; sprite_idx--) {
-        int16_t sp_x = ppu.oam[sprite_idx].x;
-        int16_t sp_y = ppu.oam[sprite_idx].y;
-        uint8_t sp_w = size_lut[ppu.obj_sprite_size]
-                               [ppu.oam[sprite_idx].use_second_size * 2];
-        uint8_t sp_h = size_lut[ppu.obj_sprite_size]
-                               [ppu.oam[sprite_idx].use_second_size * 2 + 1];
-        if (IN_INTERVAL(x, sp_x, sp_x + sp_w) &&
-            IN_INTERVAL(y, sp_y, sp_y + sp_h)) {
+    uint8_t draw_count = 0;
+
+    // step 1: collecting (lower index, higher priority)
+    for (uint8_t i = 0; i < 128; i++) {
+        int16_t sp_x = ppu.oam[i].x;
+        int16_t sp_y = ppu.oam[i].y;
+        uint8_t sp_w =
+            size_lut[ppu.obj_sprite_size][ppu.oam[i].use_second_size * 2];
+        uint8_t sp_h =
+            size_lut[ppu.obj_sprite_size][ppu.oam[i].use_second_size * 2 + 1];
+        ppu.oam[i].draw_this_line = IN_INTERVAL(y, sp_y, sp_y + sp_h) &&
+                                    IN_INTERVAL(sp_x, 0, WINDOW_WIDTH - sp_w) &&
+                                    draw_count++ < 32;
+    }
+
+    uint16_t name_base = ppu.obj_name_base_address << 14;
+    uint16_t name_alt = name_base + ((ppu.obj_name_select + 1) << 12);
+
+    // step 2: drawing (lower index, higher priority)
+    uint32_t *target = (uint32_t *)(framebuffer + (WINDOW_WIDTH * 4 * y));
+
+    for (int8_t i = 127; i >= 0; i--) {
+        if (ppu.oam[i].draw_this_line) {
+            int16_t sp_x = ppu.oam[i].x;
+            // int16_t sp_y = ppu.oam[i].y;
+            uint8_t sp_w =
+                size_lut[ppu.obj_sprite_size][ppu.oam[i].use_second_size * 2];
+            uint8_t sp_h = size_lut[ppu.obj_sprite_size]
+                                   [ppu.oam[i].use_second_size * 2 + 1];
+            uint8_t y_off = y - ppu.oam[i].y;
+            if (ppu.oam[i].flip_v)
+                y_off = sp_h - y_off;
+
+            uint8_t tiles[32] = {0};
+            for (uint8_t j = 0; j < (sp_w / 8); j++) {
+                uint16_t tile_addr =
+                    (ppu.oam[i].use_second_sprite_page ? name_alt : name_base) +
+                    (ppu.oam[i].tile_idx + j) * 32 + (y_off % 8) * 2 +
+                    (y_off / 8) * 512;
+                tiles[j * 4 + 0] = ppu.vram[tile_addr];
+                tiles[j * 4 + 1] = ppu.vram[tile_addr + 1];
+                tiles[j * 4 + 2] = ppu.vram[tile_addr + 16];
+                tiles[j * 4 + 3] = ppu.vram[tile_addr + 17];
+            }
+
+            for (int16_t x_off = 0; x_off < sp_w; x_off++) {
+                int16_t x =
+                    sp_x + (ppu.oam[i].flip_h ? (sp_w - (x_off + 1)) : x_off);
+                if (x < 0 || x > 255)
+                    continue;
+                uint8_t col_idx =
+                    (((tiles[x_off / 8] >> (7 - (x_off % 8))) & 1) << 0) |
+                    (((tiles[x_off / 8 + 1] >> (7 - (x_off % 8))) & 1) << 1) |
+                    (((tiles[x_off / 8 + 2] >> (7 - (x_off % 8))) & 1) << 2) |
+                    (((tiles[x_off / 8 + 3] >> (7 - (x_off % 8))) & 1) << 3);
+
+                uint32_t col = r5g5b5_to_r8g8b8a8(
+                    ppu.cgram[128 + ppu.oam[i].palette * 16 + col_idx]);
+
+                if (col_idx != 0)
+                    target[x] = col;
+            }
         }
     }
 }
@@ -94,13 +155,11 @@ void try_step_ppu(void) {
         if (ppu.beam_x == 339 && ppu.beam_y == 261)
             cpu.memory.vblank_has_occurred = false;
 
-        if (ppu.beam_x > 21 && ppu.beam_x < 278 && ppu.beam_y > 0 &&
-            ppu.beam_y < 225) {
-
-            uint16_t drawing_x = ppu.beam_x - 22;
-            uint16_t drawing_y = ppu.beam_y - 1;
-
-            draw_obj(drawing_x, drawing_y);
+        if (ppu.beam_x == 22 && ppu.beam_y > 0 && ppu.beam_y < 225) {
+            for (uint16_t i = 0; i < 256 * 4; i++) {
+                framebuffer[(ppu.beam_y - 1) * WINDOW_WIDTH * 4 + i] = 0;
+            }
+            draw_obj(ppu.beam_y - 1);
         }
     }
 }
