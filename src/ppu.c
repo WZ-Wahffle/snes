@@ -85,7 +85,6 @@ void draw_obj(uint16_t y) {
     for (int8_t i = 127; i >= 0; i--) {
         if (ppu.oam[i].draw_this_line) {
             int16_t sp_x = ppu.oam[i].x;
-            // int16_t sp_y = ppu.oam[i].y;
             uint8_t sp_w =
                 size_lut[ppu.obj_sprite_size][ppu.oam[i].use_second_size * 2];
             uint8_t sp_h = size_lut[ppu.obj_sprite_size]
@@ -94,13 +93,17 @@ void draw_obj(uint16_t y) {
             if (ppu.oam[i].flip_v)
                 y_off = sp_h - y_off;
 
+            // The 4 bytes needed per 4bpp line of 8 pixels are prefetched
+            // here. Since the maximum number of these lines per sprite is 8
+            // (64 pixels / (8 pixels / line)), a maximum buffer size of 32
+            // ((4 bytes / line) * 8 lines) is allocated.
             uint8_t tiles[32] = {0};
             for (uint8_t j = 0; j < (sp_w / 8); j++) {
                 uint16_t tile_addr =
                     (ppu.oam[i].use_second_sprite_page ? name_alt : name_base) +
                     (ppu.oam[i].tile_idx + j) * 32 + (y_off % 8) * 2 +
                     (y_off / 8) * 512;
-                tiles[j * 4 + 0] = ppu.vram[tile_addr];
+                tiles[j * 4 + 0] = ppu.vram[tile_addr + 0];
                 tiles[j * 4 + 1] = ppu.vram[tile_addr + 1];
                 tiles[j * 4 + 2] = ppu.vram[tile_addr + 16];
                 tiles[j * 4 + 3] = ppu.vram[tile_addr + 17];
@@ -112,10 +115,14 @@ void draw_obj(uint16_t y) {
                 if (x < 0 || x > 255)
                     continue;
                 uint8_t col_idx =
-                    (((tiles[x_off / 8] >> (7 - (x_off % 8))) & 1) << 0) |
-                    (((tiles[x_off / 8 + 1] >> (7 - (x_off % 8))) & 1) << 1) |
-                    (((tiles[x_off / 8 + 2] >> (7 - (x_off % 8))) & 1) << 2) |
-                    (((tiles[x_off / 8 + 3] >> (7 - (x_off % 8))) & 1) << 3);
+                    (((tiles[(x_off / 8) * 4 + 0] >> (7 - (x_off % 8))) & 1)
+                     << 0) |
+                    (((tiles[(x_off / 8) * 4 + 1] >> (7 - (x_off % 8))) & 1)
+                     << 1) |
+                    (((tiles[(x_off / 8) * 4 + 2] >> (7 - (x_off % 8))) & 1)
+                     << 2) |
+                    (((tiles[(x_off / 8) * 4 + 3] >> (7 - (x_off % 8))) & 1)
+                     << 3);
 
                 uint32_t col = r5g5b5_to_r8g8b8a8(
                     ppu.cgram[128 + ppu.oam[i].palette * 16 + col_idx]);
