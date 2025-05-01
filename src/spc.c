@@ -217,6 +217,9 @@ void spc_execute(void) {
     case 0x10:
         spc_bpl(SM_REL);
         break;
+    case 0x13:
+        spc_bbc0(SM_DIR_PAGE_BIT_REL);
+        break;
     case 0x1a:
         spc_dew(SM_DIR_PAGE);
         break;
@@ -252,6 +255,9 @@ void spc_execute(void) {
         break;
     case 0x30:
         spc_bmi(SM_REL);
+        break;
+    case 0x33:
+        spc_bbc1(SM_DIR_PAGE_BIT_REL);
         break;
     case 0x3a:
         spc_inw(SM_DIR_PAGE);
@@ -408,6 +414,9 @@ void spc_execute(void) {
         break;
     case 0xb5:
         spc_sbc(SM_ABSX);
+        break;
+    case 0xb6:
+        spc_sbc(SM_ABSY);
         break;
     case 0xba:
         spc_ldw(SM_DIR_PAGE);

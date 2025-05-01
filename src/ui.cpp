@@ -123,7 +123,7 @@ void vram_window(void) {
 void oam_lo_window(void) {
     ImGui::Begin("oam", NULL, ImGuiWindowFlags_HorizontalScrollbar);
     ImGui::Text("DEF Nametable: 0x%04x", ppu.obj_name_base_address << 14);
-    ImGui::Text("ALT Nametable: 0x%04x", (ppu.obj_name_base_address << 14) + ((ppu.obj_name_select + 1) << 12));
+    ImGui::Text("ALT Nametable: 0x%04x", (ppu.obj_name_base_address << 14) + ((ppu.obj_name_select + 1) << 13));
     ImGui::Text("Sprite size index: %d", ppu.obj_sprite_size);
     if (ImGui::BeginTable("##oam", 5,
                           ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {

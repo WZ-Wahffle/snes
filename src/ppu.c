@@ -28,12 +28,14 @@ void try_step_cpu(void) {
             push_16(cpu.pc);
             push_8(cpu.p);
             cpu.pc = read_16(cpu.emulation_mode ? 0xfffa : 0xffea, 0);
+            cpu.pbr = 0;
         } else if (!get_status_bit(STATUS_IRQOFF) && cpu.irq) {
             if (!cpu.emulation_mode)
                 push_8(cpu.pbr);
             push_16(cpu.pc);
             push_8(cpu.p);
             cpu.pc = read_16(cpu.emulation_mode ? 0xfffe : 0xffee, 0);
+            cpu.pbr = 0;
             cpu.irq = false;
         }
         prev_vblank = curr_vblank;
@@ -57,6 +59,33 @@ uint32_t r5g5b5_to_r8g8b8a8(uint16_t in) {
     return ret;
 }
 
+void draw_bg1(uint16_t y, color_depth_t bpp) {
+    uint32_t *target = (uint32_t *)(framebuffer + (WINDOW_WIDTH * 4 * y));
+
+    uint8_t tilemap_w = ppu.bg_config[0].double_h_tilemap ? 64 : 32;
+    uint8_t tilemap_h = ppu.bg_config[0].double_v_tilemap ? 64 : 32;
+    uint16_t tilemap_line_pointer = ppu.bg_config[0].tilemap_addr;
+    tilemap_line_pointer +=
+        (((y + ppu.bg_config[0].v_scroll) / 8) % tilemap_h) * tilemap_w;
+    uint16_t tilemap_line_index = 0;
+
+    uint16_t tilemap_fetch[64] = {0};
+    for (uint8_t i = 0; i < 64; i++) {
+        tilemap_fetch[i] =
+            TO_U16(ppu.vram[tilemap_line_pointer + tilemap_line_index * 2],
+                   ppu.vram[tilemap_line_pointer + tilemap_line_index * 2 + 1]);
+        tilemap_line_index++;
+        if (tilemap_line_index > tilemap_w)
+            tilemap_line_index %= tilemap_w;
+    }
+
+    uint8_t tile_size = ppu.bg_config[0].large_characters ? 16 : 8;
+    for (uint16_t x = 0; x < WINDOW_WIDTH; x++) {
+        uint8_t tilemap_idx = ((x + ppu.bg_config[0].h_scroll) / tile_size) % 64;
+
+    }
+}
+
 void draw_obj(uint16_t y) {
     static uint8_t size_lut[8][4] = {
         {8, 8, 16, 16},   {8, 8, 32, 32},   {8, 8, 64, 64},   {16, 16, 32, 32},
@@ -77,7 +106,7 @@ void draw_obj(uint16_t y) {
     }
 
     uint16_t name_base = ppu.obj_name_base_address << 14;
-    uint16_t name_alt = name_base + ((ppu.obj_name_select + 1) << 12);
+    uint16_t name_alt = name_base + ((ppu.obj_name_select + 1) << 13);
 
     // step 2: drawing (lower index, higher priority)
     uint32_t *target = (uint32_t *)(framebuffer + (WINDOW_WIDTH * 4 * y));

@@ -56,6 +56,9 @@ uint8_t mmu_read(uint16_t addr, uint8_t bank, bool log) {
                             ret, addr, bank);
             return ret;
         }
+        if (bank >= 0x70 && bank <= 0x7d) {
+            return cpu.memory.sram[addr % cpu.memory.sram_size];
+        }
         break;
     case HIROM:
         if ((bank < 0x40 && addr >= 0x8000) ||
@@ -657,6 +660,10 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
             TODO("expansion write");
         }
     } else if (bank == 0x7e || bank == 0x7f) {
+        ASSERT(
+            (bank - 0x7e) * 0x10000 + addr < 0x20000,
+            "Tried to access RAM out of bounds at address 0x%04x, bank 0x%02x",
+            addr, bank);
         cpu.memory.ram[(bank - 0x7e) * 0x10000 + addr] = value;
     } else {
         ASSERT(0, "Tried to write 0x%02x to bank 0x%02x, address 0x%04x", value,
