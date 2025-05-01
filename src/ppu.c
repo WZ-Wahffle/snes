@@ -59,6 +59,99 @@ uint32_t r5g5b5_to_r8g8b8a8(uint16_t in) {
     return ret;
 }
 
+void fetch_tile_color_row(uint16_t tile_vram_offset, uint8_t y_offset,
+                          uint8_t width, uint8_t height, color_depth_t bpp,
+                          uint8_t out[width]) {
+    ASSERT(height > y_offset,
+           "Tried indexing tile of height %d out of bounds at y = %d", height,
+           y_offset);
+    switch (bpp) {
+    case BPP_2: {
+        uint16_t adj_tile_vram_offset =
+            tile_vram_offset + (y_offset % 8) * 2 + (y_offset / 8) * 256;
+        for (uint8_t i = 0; i < width / 8; i++) {
+            out[i * 8 + 0] =
+                (((ppu.vram[adj_tile_vram_offset + 0] >> 7) & 1) << 0) |
+                (((ppu.vram[adj_tile_vram_offset + 1] >> 7) & 1) << 1);
+            out[i * 8 + 1] =
+                (((ppu.vram[adj_tile_vram_offset + 0] >> 6) & 1) << 0) |
+                (((ppu.vram[adj_tile_vram_offset + 1] >> 6) & 1) << 1);
+            out[i * 8 + 2] =
+                (((ppu.vram[adj_tile_vram_offset + 0] >> 5) & 1) << 0) |
+                (((ppu.vram[adj_tile_vram_offset + 1] >> 5) & 1) << 1);
+            out[i * 8 + 3] =
+                (((ppu.vram[adj_tile_vram_offset + 0] >> 4) & 1) << 0) |
+                (((ppu.vram[adj_tile_vram_offset + 1] >> 4) & 1) << 1);
+            out[i * 8 + 4] =
+                (((ppu.vram[adj_tile_vram_offset + 0] >> 3) & 1) << 0) |
+                (((ppu.vram[adj_tile_vram_offset + 1] >> 3) & 1) << 1);
+            out[i * 8 + 5] =
+                (((ppu.vram[adj_tile_vram_offset + 0] >> 2) & 1) << 0) |
+                (((ppu.vram[adj_tile_vram_offset + 1] >> 2) & 1) << 1);
+            out[i * 8 + 6] =
+                (((ppu.vram[adj_tile_vram_offset + 0] >> 1) & 1) << 0) |
+                (((ppu.vram[adj_tile_vram_offset + 1] >> 1) & 1) << 1);
+            out[i * 8 + 7] =
+                (((ppu.vram[adj_tile_vram_offset + 0] >> 0) & 1) << 0) |
+                (((ppu.vram[adj_tile_vram_offset + 1] >> 0) & 1) << 1);
+            adj_tile_vram_offset += 16;
+        }
+    } break;
+    case BPP_4: {
+        uint16_t adj_tile_vram_offset =
+            tile_vram_offset + (y_offset % 8) * 2 + (y_offset / 8) * 512;
+        for (uint8_t i = 0; i < width / 8; i++) {
+            out[i * 8 + 0] =
+                (((ppu.vram[adj_tile_vram_offset + 0] >> 7) & 1) << 0) |
+                (((ppu.vram[adj_tile_vram_offset + 1] >> 7) & 1) << 1) |
+                (((ppu.vram[adj_tile_vram_offset + 16] >> 7) & 1) << 2) |
+                (((ppu.vram[adj_tile_vram_offset + 17] >> 7) & 1) << 3);
+            out[i * 8 + 1] =
+                (((ppu.vram[adj_tile_vram_offset + 0] >> 6) & 1) << 0) |
+                (((ppu.vram[adj_tile_vram_offset + 1] >> 6) & 1) << 1) |
+                (((ppu.vram[adj_tile_vram_offset + 16] >> 6) & 1) << 2) |
+                (((ppu.vram[adj_tile_vram_offset + 17] >> 6) & 1) << 3);
+            out[i * 8 + 2] =
+                (((ppu.vram[adj_tile_vram_offset + 0] >> 5) & 1) << 0) |
+                (((ppu.vram[adj_tile_vram_offset + 1] >> 5) & 1) << 1) |
+                (((ppu.vram[adj_tile_vram_offset + 16] >> 5) & 1) << 2) |
+                (((ppu.vram[adj_tile_vram_offset + 17] >> 5) & 1) << 3);
+            out[i * 8 + 3] =
+                (((ppu.vram[adj_tile_vram_offset + 0] >> 4) & 1) << 0) |
+                (((ppu.vram[adj_tile_vram_offset + 1] >> 4) & 1) << 1) |
+                (((ppu.vram[adj_tile_vram_offset + 16] >> 4) & 1) << 2) |
+                (((ppu.vram[adj_tile_vram_offset + 17] >> 4) & 1) << 3);
+            out[i * 8 + 4] =
+                (((ppu.vram[adj_tile_vram_offset + 0] >> 3) & 1) << 0) |
+                (((ppu.vram[adj_tile_vram_offset + 1] >> 3) & 1) << 1) |
+                (((ppu.vram[adj_tile_vram_offset + 16] >> 3) & 1) << 2) |
+                (((ppu.vram[adj_tile_vram_offset + 17] >> 3) & 1) << 3);
+            out[i * 8 + 5] =
+                (((ppu.vram[adj_tile_vram_offset + 0] >> 2) & 1) << 0) |
+                (((ppu.vram[adj_tile_vram_offset + 1] >> 2) & 1) << 1) |
+                (((ppu.vram[adj_tile_vram_offset + 16] >> 2) & 1) << 2) |
+                (((ppu.vram[adj_tile_vram_offset + 17] >> 2) & 1) << 3);
+            out[i * 8 + 6] =
+                (((ppu.vram[adj_tile_vram_offset + 0] >> 1) & 1) << 0) |
+                (((ppu.vram[adj_tile_vram_offset + 1] >> 1) & 1) << 1) |
+                (((ppu.vram[adj_tile_vram_offset + 16] >> 1) & 1) << 2) |
+                (((ppu.vram[adj_tile_vram_offset + 17] >> 1) & 1) << 3);
+            out[i * 8 + 7] =
+                (((ppu.vram[adj_tile_vram_offset + 0] >> 0) & 1) << 0) |
+                (((ppu.vram[adj_tile_vram_offset + 1] >> 0) & 1) << 1) |
+                (((ppu.vram[adj_tile_vram_offset + 16] >> 0) & 1) << 2) |
+                (((ppu.vram[adj_tile_vram_offset + 17] >> 0) & 1) << 3);
+            adj_tile_vram_offset += 32;
+        }
+    } break;
+    case BPP_8:
+        TODO("8bpp");
+        break;
+    default:
+        UNREACHABLE_SWITCH(bpp);
+    }
+}
+/*
 void draw_bg1(uint16_t y, color_depth_t bpp) {
     uint32_t *target = (uint32_t *)(framebuffer + (WINDOW_WIDTH * 4 * y));
 
@@ -81,10 +174,10 @@ void draw_bg1(uint16_t y, color_depth_t bpp) {
 
     uint8_t tile_size = ppu.bg_config[0].large_characters ? 16 : 8;
     for (uint16_t x = 0; x < WINDOW_WIDTH; x++) {
-        uint8_t tilemap_idx = ((x + ppu.bg_config[0].h_scroll) / tile_size) % 64;
-
+        uint8_t tilemap_idx =
+            ((x + ppu.bg_config[0].h_scroll) / tile_size) % 64;
     }
-}
+}*/
 
 void draw_obj(uint16_t y) {
     static uint8_t size_lut[8][4] = {
@@ -120,43 +213,27 @@ void draw_obj(uint16_t y) {
                                    [ppu.oam[i].use_second_size * 2 + 1];
             uint8_t y_off = y - ppu.oam[i].y;
             if (ppu.oam[i].flip_v)
-                y_off = sp_h - y_off;
+                y_off = (sp_h - 1) - y_off;
 
             // The 4 bytes needed per 4bpp line of 8 pixels are prefetched
             // here. Since the maximum number of these lines per sprite is 8
             // (64 pixels / (8 pixels / line)), a maximum buffer size of 32
             // ((4 bytes / line) * 8 lines) is allocated.
-            uint8_t tiles[32] = {0};
-            for (uint8_t j = 0; j < (sp_w / 8); j++) {
-                uint16_t tile_addr =
-                    (ppu.oam[i].use_second_sprite_page ? name_alt : name_base) +
-                    (ppu.oam[i].tile_idx + j) * 32 + (y_off % 8) * 2 +
-                    (y_off / 8) * 512;
-                tiles[j * 4 + 0] = ppu.vram[tile_addr + 0];
-                tiles[j * 4 + 1] = ppu.vram[tile_addr + 1];
-                tiles[j * 4 + 2] = ppu.vram[tile_addr + 16];
-                tiles[j * 4 + 3] = ppu.vram[tile_addr + 17];
-            }
+            uint8_t tiles[64] = {0};
+            fetch_tile_color_row(
+                (ppu.oam[i].use_second_sprite_page ? name_alt : name_base) +
+                    ppu.oam[i].tile_idx * 32,
+                y_off, sp_w, sp_h, BPP_4, tiles);
 
             for (int16_t x_off = 0; x_off < sp_w; x_off++) {
                 int16_t x =
                     sp_x + (ppu.oam[i].flip_h ? (sp_w - (x_off + 1)) : x_off);
                 if (x < 0 || x > 255)
                     continue;
-                uint8_t col_idx =
-                    (((tiles[(x_off / 8) * 4 + 0] >> (7 - (x_off % 8))) & 1)
-                     << 0) |
-                    (((tiles[(x_off / 8) * 4 + 1] >> (7 - (x_off % 8))) & 1)
-                     << 1) |
-                    (((tiles[(x_off / 8) * 4 + 2] >> (7 - (x_off % 8))) & 1)
-                     << 2) |
-                    (((tiles[(x_off / 8) * 4 + 3] >> (7 - (x_off % 8))) & 1)
-                     << 3);
-
                 uint32_t col = r5g5b5_to_r8g8b8a8(
-                    ppu.cgram[128 + ppu.oam[i].palette * 16 + col_idx]);
+                    ppu.cgram[128 + ppu.oam[i].palette * 16 + tiles[x_off]]);
 
-                if (col_idx != 0)
+                if (tiles[x_off] != 0)
                     target[x] = col;
             }
         }
