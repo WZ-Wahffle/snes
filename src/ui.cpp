@@ -130,18 +130,19 @@ void vram_window(void) {
     ImGui::End();
 }
 
-void oam_lo_window(void) {
+void oam_window(void) {
     ImGui::Begin("oam", NULL, ImGuiWindowFlags_HorizontalScrollbar);
     ImGui::Text("DEF Nametable: 0x%04x", ppu.obj_name_base_address << 14);
     ImGui::Text("ALT Nametable: 0x%04x", (ppu.obj_name_base_address << 14) + ((ppu.obj_name_select + 1) << 13));
     ImGui::Text("Sprite size index: %d", ppu.obj_sprite_size);
-    if (ImGui::BeginTable("##oam", 5,
+    if (ImGui::BeginTable("##oam", 6,
                           ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
         ImGui::TableSetupColumn("X", ImGuiTableColumnFlags_WidthFixed);
         ImGui::TableSetupColumn("Y", ImGuiTableColumnFlags_WidthFixed);
-        ImGui::TableSetupColumn("TIdx", ImGuiTableColumnFlags_WidthFixed);
-        ImGui::TableSetupColumn("Pall", ImGuiTableColumnFlags_WidthFixed);
-        ImGui::TableSetupColumn("ASize", ImGuiTableColumnFlags_WidthFixed);
+        ImGui::TableSetupColumn("TileIdx", ImGuiTableColumnFlags_WidthFixed);
+        ImGui::TableSetupColumn("Palette", ImGuiTableColumnFlags_WidthFixed);
+        ImGui::TableSetupColumn("AltSize", ImGuiTableColumnFlags_WidthFixed);
+        ImGui::TableSetupColumn("Prio", ImGuiTableColumnFlags_WidthFixed);
         ImGui::TableHeadersRow();
 
         ImGui::TableNextRow();
@@ -157,6 +158,8 @@ void oam_lo_window(void) {
             ImGui::Text("0x%02x", ppu.oam[i].palette);
             ImGui::TableNextColumn();
             ImGui::Text("%c", ppu.oam[i].use_second_size ? 'X' : ' ');
+            ImGui::TableNextColumn();
+            ImGui::Text("%d", ppu.oam[i].priority);
 
             if (i != 127) {
                 ImGui::TableNextRow();
@@ -399,7 +402,7 @@ void cpp_imgui_render(void) {
     dma_window();
     ppu_window();
     bg_window();
-    oam_lo_window();
+    oam_window();
     cpu_ram_window();
     cpu_rom_window();
     cpu_window();

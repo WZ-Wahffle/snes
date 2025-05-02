@@ -409,6 +409,9 @@ void cpu_execute(void) {
     case 0x3d:
         and_(AM_ABSX);
         break;
+    case 0x3e:
+        rol(AM_ABSX);
+        break;
     case 0x3f:
         and_(AM_ABSX_L);
         break;

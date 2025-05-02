@@ -8,6 +8,7 @@ extern ppu_t ppu;
 extern spc_t spc;
 
 uint8_t framebuffer[WINDOW_WIDTH * WINDOW_HEIGHT * 4] = {0};
+uint8_t priority[WINDOW_WIDTH * WINDOW_HEIGHT] = {0};
 
 void set_pixel(uint16_t x, uint16_t y, uint32_t color) {
     ((uint32_t *)framebuffer)[x + WINDOW_WIDTH * y] = color;
@@ -153,14 +154,15 @@ void fetch_tile_color_row(uint16_t tile_vram_offset, uint8_t y_offset,
     }
 }
 
-void draw_bg1(uint16_t y, color_depth_t bpp) {
+void draw_bg1(uint16_t y, color_depth_t bpp, uint8_t low_prio,
+              uint8_t high_prio) {
     uint32_t *target = (uint32_t *)(framebuffer + (WINDOW_WIDTH * 4 * y));
     uint8_t tilemap_w = ppu.bg_config[0].double_h_tilemap ? 64 : 32;
     uint8_t tilemap_h = ppu.bg_config[0].double_v_tilemap ? 64 : 32;
     uint16_t tilemap_line_pointer = ppu.bg_config[0].tilemap_addr;
     uint8_t tile_size = ppu.bg_config[0].large_characters ? 16 : 8;
     uint8_t tile_index_v = (y + ppu.bg_config[0].v_scroll) / tile_size;
-    if(tile_index_v > 31 && tilemap_w == 64) {
+    if (tile_index_v > 31 && tilemap_w == 64) {
         tilemap_line_pointer += 0x1000;
     }
     tilemap_line_pointer += (tile_index_v % tilemap_h) * tilemap_w;
@@ -192,8 +194,65 @@ void draw_bg1(uint16_t y, color_depth_t bpp) {
                                  (tilemap_fetch[tilemap_idx] & 0x3ff) *
                                      ((bpp * tile_size * tile_size) / 8),
                              tile_y_off, tile_size, tile_size, bpp, out);
-        target[x] =
-            r5g5b5_to_r8g8b8a8(ppu.cgram[palette * 16 + out[tile_x_off]]);
+
+        bool prio = tilemap_fetch[tilemap_idx] & 0x2000;
+
+        if (priority[y * WINDOW_WIDTH + x] < (prio ? high_prio : low_prio)) {
+            target[x] =
+                r5g5b5_to_r8g8b8a8(ppu.cgram[palette * 16 + out[tile_x_off]]);
+            priority[y * WINDOW_WIDTH + x] = prio ? high_prio : low_prio;
+        }
+    }
+}
+
+void draw_bg2(uint16_t y, color_depth_t bpp, uint8_t low_prio,
+              uint8_t high_prio) {
+    uint32_t *target = (uint32_t *)(framebuffer + (WINDOW_WIDTH * 4 * y));
+    uint8_t tilemap_w = ppu.bg_config[1].double_h_tilemap ? 64 : 32;
+    uint8_t tilemap_h = ppu.bg_config[1].double_v_tilemap ? 64 : 32;
+    uint16_t tilemap_line_pointer = ppu.bg_config[1].tilemap_addr;
+    uint8_t tile_size = ppu.bg_config[1].large_characters ? 16 : 8;
+    uint8_t tile_index_v = (y + ppu.bg_config[1].v_scroll) / tile_size;
+    if (tile_index_v > 31 && tilemap_w == 64) {
+        tilemap_line_pointer += 0x1000;
+    }
+    tilemap_line_pointer += (tile_index_v % tilemap_h) * tilemap_w;
+    uint16_t tilemap_line_index = 0;
+
+    uint16_t tilemap_fetch[64] = {0};
+    for (uint8_t i = 0; i < 64; i++) {
+        tilemap_fetch[i] =
+            TO_U16(ppu.vram[tilemap_line_pointer + tilemap_line_index * 2],
+                   ppu.vram[tilemap_line_pointer + tilemap_line_index * 2 + 1]);
+        tilemap_line_index++;
+        if (tilemap_line_index > tilemap_w)
+            tilemap_line_index %= tilemap_w;
+    }
+
+    for (uint16_t x = 0; x < WINDOW_WIDTH; x++) {
+        uint8_t tilemap_idx =
+            ((x + ppu.bg_config[1].h_scroll) / tile_size) % 64;
+        uint8_t out[16] = {0};
+        uint8_t tile_y_off = (y + ppu.bg_config[1].v_scroll) % tile_size;
+        if (tilemap_fetch[tilemap_idx] >> 15)
+            tile_y_off = tile_size - 1 - tile_y_off;
+        uint8_t tile_x_off = (x + ppu.bg_config[1].h_scroll) % tile_size;
+        if ((tilemap_fetch[tilemap_idx] >> 14) & 1)
+            tile_x_off = tile_size - 1 - tile_x_off;
+        uint8_t palette = (tilemap_fetch[tilemap_idx] >> 10) & 0b111;
+
+        fetch_tile_color_row(ppu.bg_config[1].tiledata_addr +
+                                 (tilemap_fetch[tilemap_idx] & 0x3ff) *
+                                     ((bpp * tile_size * tile_size) / 8),
+                             tile_y_off, tile_size, tile_size, bpp, out);
+
+        bool prio = tilemap_fetch[tilemap_idx] & 0x2000;
+
+        if (priority[y * WINDOW_WIDTH + x] < (prio ? high_prio : low_prio)) {
+            target[x] =
+                r5g5b5_to_r8g8b8a8(ppu.cgram[palette * 16 + out[tile_x_off]]);
+            priority[y * WINDOW_WIDTH + x] = prio ? high_prio : low_prio;
+        }
     }
 }
 
@@ -243,6 +302,7 @@ void draw_obj(uint16_t y) {
                     ppu.oam[i].tile_idx * 32,
                 y_off, sp_w, sp_h, BPP_4, tiles);
 
+            uint8_t prio = ppu.oam[i].priority * 3 + 2;
             for (int16_t x_off = 0; x_off < sp_w; x_off++) {
                 int16_t x =
                     sp_x + (ppu.oam[i].flip_h ? (sp_w - (x_off + 1)) : x_off);
@@ -251,8 +311,10 @@ void draw_obj(uint16_t y) {
                 uint32_t col = r5g5b5_to_r8g8b8a8(
                     ppu.cgram[128 + ppu.oam[i].palette * 16 + tiles[x_off]]);
 
-                if (tiles[x_off] != 0)
+                if (tiles[x_off] != 0 && priority[y * WINDOW_WIDTH + x] < prio) {
                     target[x] = col;
+                    priority[y * WINDOW_WIDTH + x] = prio;
+                }
             }
         }
     }
@@ -287,11 +349,17 @@ void try_step_ppu(void) {
             cpu.memory.vblank_has_occurred = false;
 
         if (ppu.beam_x == 22 && ppu.beam_y > 0 && ppu.beam_y < 225) {
-            for (uint16_t i = 0; i < 256 * 4; i++) {
-                framebuffer[(ppu.beam_y - 1) * WINDOW_WIDTH * 4 + i] = 0;
+            for (uint16_t i = 0; i < 256; i++) {
+                framebuffer[(ppu.beam_y - 1) * WINDOW_WIDTH * 4 + i * 4 + 0] = 0;
+                framebuffer[(ppu.beam_y - 1) * WINDOW_WIDTH * 4 + i * 4 + 1] = 0;
+                framebuffer[(ppu.beam_y - 1) * WINDOW_WIDTH * 4 + i * 4 + 2] = 0;
+                framebuffer[(ppu.beam_y - 1) * WINDOW_WIDTH * 4 + i * 4 + 3] = 0;
+                priority[(ppu.beam_y - 1) * WINDOW_WIDTH + i] = 0;
             }
-            if (ppu.bg_mode == 1)
-                draw_bg1(ppu.beam_y - 1, BPP_4);
+            if (ppu.bg_mode == 1) {
+                draw_bg2(ppu.beam_y - 1, BPP_4, 6, 9);
+                draw_bg1(ppu.beam_y - 1, BPP_4, 7, 10);
+            }
             draw_obj(ppu.beam_y - 1);
         }
     }
