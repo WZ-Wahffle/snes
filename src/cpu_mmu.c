@@ -89,7 +89,7 @@ uint8_t mmu_read(uint16_t addr, uint8_t bank, bool log) {
             return cpu.memory.ram[addr];
         } else if (addr < 0x6000) {
             switch (addr) {
-                case 0x213f:
+            case 0x213f:
                 return 0;
             case 0x2140:
             case 0x2141:
@@ -383,6 +383,18 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                 ppu.col_window_2_invert = value & 64;
                 ppu.col_window_2_enable = value & 128;
                 break;
+            case 0x2126:
+                ppu.window_1_l = value;
+                break;
+            case 0x2127:
+                ppu.window_1_r = value;
+                break;
+            case 0x2128:
+                ppu.window_2_l = value;
+                break;
+            case 0x2129:
+                ppu.window_2_r = value;
+                break;
             case 0x212a:
                 ppu.bg_config[0].mask_logic = (value >> 0) & 0b11;
                 ppu.bg_config[1].mask_logic = (value >> 2) & 0b11;
@@ -554,8 +566,13 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                     }
                 break;
             case 0x420c:
-                for (uint8_t i = 0; i < 8; i++)
+                for (uint8_t i = 0; i < 8; i++) {
                     cpu.memory.dmas[i].hdma_enable = value & (1 << i);
+                    if (cpu.memory.dmas[i].hdma_enable) {
+                        cpu.memory.dmas[i].hdma_current_address =
+                            cpu.memory.dmas[i].dma_src_addr;
+                    }
+                }
                 break;
             case 0x4300:
             case 0x4310:

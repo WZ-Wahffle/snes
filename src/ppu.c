@@ -179,8 +179,8 @@ void draw_bg1(uint16_t y, color_depth_t bpp, uint8_t low_prio,
     }
 
     uint8_t out[1024] = {0};
-    uint8_t tile_y_off = (y + ppu.bg_config[0].v_scroll) % tile_size;
     for (uint8_t tile_idx = 0; tile_idx < tilemap_w; tile_idx++) {
+        uint8_t tile_y_off = (y + ppu.bg_config[0].v_scroll) % tile_size;
         if (tilemap_fetch[tile_idx] >> 15)
             tile_y_off = tile_size - 1 - tile_y_off;
         fetch_tile_color_row(ppu.bg_config[0].tiledata_addr +
@@ -298,10 +298,6 @@ void draw_obj(uint16_t y) {
             if (ppu.oam[i].flip_v)
                 y_off = (sp_h - 1) - y_off;
 
-            // The 4 bytes needed per 4bpp line of 8 pixels are prefetched
-            // here. Since the maximum number of these lines per sprite is 8
-            // (64 pixels / (8 pixels / line)), a maximum buffer size of 32
-            // ((4 bytes / line) * 8 lines) is allocated.
             uint8_t tiles[64] = {0};
             fetch_tile_color_row(
                 (ppu.oam[i].use_second_sprite_page ? name_alt : name_base) +
@@ -355,6 +351,83 @@ void try_step_ppu(void) {
             cpu.memory.vblank_has_occurred = true;
         if (ppu.beam_x == 339 && ppu.beam_y == 261)
             cpu.memory.vblank_has_occurred = false;
+
+        if (ppu.beam_x == 278 && ppu.beam_y > 0 && ppu.beam_y < 225) {
+            for (uint8_t i = 0; i < 8; i++) {
+                if (cpu.memory.dmas[i].hdma_enable) {
+                    if (cpu.memory.dmas[i].scanlines_left == 0) {
+                        uint32_t addr = cpu.memory.dmas[i].hdma_current_address;
+                        uint8_t next =
+                            read_8(U24_LOSHORT(addr), U24_HIBYTE(addr));
+                        addr = TO_U24(U24_LOSHORT(addr) + 1, U24_HIBYTE(addr));
+                        if (next == 0) {
+                            cpu.memory.dmas[i].hdma_enable = false;
+                            continue;
+                        }
+                        cpu.memory.dmas[i].hdma_repeat = next & 0x80;
+                        cpu.memory.dmas[i].scanlines_left = next & 0x7f;
+                        cpu.memory.dmas[i].hdma_current_address = addr;
+                        cpu.memory.dmas[i].hdma_waiting = false;
+                        if (cpu.memory.dmas[i].indirect_hdma) {
+                            cpu.memory.dmas[i].dma_byte_count = TO_U24(
+                                read_16(U24_LOSHORT(addr), U24_HIBYTE(addr)),
+                                U24_HIBYTE(cpu.memory.dmas[i].dma_byte_count));
+                            addr =
+                                TO_U24(U24_LOSHORT(addr) + 2, U24_HIBYTE(addr));
+                            cpu.memory.dmas[i].hdma_current_address = addr;
+                        }
+                    }
+
+                    static uint8_t inc_mode_lut[8][5] = {
+                        {1, 0, 0, 0, 0}, {2, 0, 1, 0, 0}, {2, 0, 0, 0, 0},
+                        {4, 0, 0, 1, 1}, {4, 0, 1, 2, 3}, {4, 0, 1, 0, 1},
+                        {2, 0, 0, 0, 0}, {4, 0, 0, 1, 1},
+                    };
+                    if (cpu.memory.dmas[i].indirect_hdma) {
+                        if (cpu.memory.dmas[i].hdma_repeat ||
+                            !cpu.memory.dmas[i].hdma_waiting) {
+                            uint8_t count =
+                                inc_mode_lut[cpu.memory.dmas[i].addr_inc_mode]
+                                            [0];
+                            uint32_t addr = cpu.memory.dmas[i].dma_byte_count;
+                            for (uint8_t j = 0; j < count; j++) {
+                                uint8_t to_write =
+                                    read_8(U24_LOSHORT(addr), U24_HIBYTE(addr));
+                                addr = TO_U24(U24_LOSHORT(addr) + 1,
+                                              U24_HIBYTE(addr));
+                                write_8(0x2100 + cpu.memory.dmas[i].b_bus_addr,
+                                        0, to_write);
+                            }
+                            cpu.memory.dmas[i].dma_byte_count = addr;
+                            if (!cpu.memory.dmas[i].hdma_repeat)
+                                cpu.memory.dmas[i].hdma_waiting = true;
+                        }
+                    } else {
+                        if (cpu.memory.dmas[i].hdma_repeat ||
+                            !cpu.memory.dmas[i].hdma_waiting) {
+                            uint8_t count =
+                                inc_mode_lut[cpu.memory.dmas[i].addr_inc_mode]
+                                            [0];
+                            uint32_t addr =
+                                cpu.memory.dmas[i].hdma_current_address;
+                            for (uint8_t j = 0; j < count; j++) {
+                                uint8_t to_write =
+                                    read_8(U24_LOSHORT(addr), U24_HIBYTE(addr));
+                                addr = TO_U24(U24_LOSHORT(addr) + 1,
+                                              U24_HIBYTE(addr));
+                                write_8(0x2100 + cpu.memory.dmas[i].b_bus_addr,
+                                        0, to_write);
+                            }
+                            cpu.memory.dmas[i].hdma_current_address = addr;
+                            if (!cpu.memory.dmas[i].hdma_repeat)
+                                cpu.memory.dmas[i].hdma_waiting = true;
+                        }
+                    }
+
+                    cpu.memory.dmas[i].scanlines_left--;
+                }
+            }
+        }
 
         if (ppu.beam_x == 22 && ppu.beam_y > 0 && ppu.beam_y < 225) {
             for (uint16_t i = 0; i < 256; i++) {

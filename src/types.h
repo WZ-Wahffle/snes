@@ -152,6 +152,7 @@ typedef struct {
         uint32_t dma_src_addr;
         uint32_t dma_byte_count;
         uint32_t hdma_current_address;
+        bool hdma_waiting;
         bool hdma_repeat;
         uint8_t scanlines_left;
     } dmas[8];
@@ -280,6 +281,7 @@ typedef struct {
     bool obj_main_window_enable, obj_sub_window_enable;
     bool obj_window_1_invert, obj_window_2_invert;
     bool col_window_1_invert, col_window_2_invert;
+    uint8_t window_1_l, window_1_r, window_2_l, window_2_r;
     bool obj_main_screen_enable, obj_sub_screen_enable;
     bool obj_color_math_enable;
     bool backdrop_color_math_enable;
