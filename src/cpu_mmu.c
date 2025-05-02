@@ -89,6 +89,8 @@ uint8_t mmu_read(uint16_t addr, uint8_t bank, bool log) {
             return cpu.memory.ram[addr];
         } else if (addr < 0x6000) {
             switch (addr) {
+                case 0x213f:
+                return 0;
             case 0x2140:
             case 0x2141:
             case 0x2142:
@@ -247,15 +249,15 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
             case 0x210a:
                 ppu.bg_config[addr - 0x2107].double_h_tilemap = value & 1;
                 ppu.bg_config[addr - 0x2107].double_v_tilemap = value & 2;
-                ppu.bg_config[addr - 0x2107].tilemap_addr = (value & 0xfc) << 8;
+                ppu.bg_config[addr - 0x2107].tilemap_addr = (value & 0x7c) << 9;
                 break;
             case 0x210b:
-                ppu.bg_config[0].tiledata_addr = (value & 0xf) << 12;
-                ppu.bg_config[1].tiledata_addr = (value >> 4) << 12;
+                ppu.bg_config[0].tiledata_addr = (value & 0xf) << 13;
+                ppu.bg_config[1].tiledata_addr = (value >> 4) << 13;
                 break;
             case 0x210c:
-                ppu.bg_config[2].tiledata_addr = (value & 0xf) << 12;
-                ppu.bg_config[3].tiledata_addr = (value >> 4) << 12;
+                ppu.bg_config[2].tiledata_addr = (value & 0xf) << 13;
+                ppu.bg_config[3].tiledata_addr = (value >> 4) << 13;
                 break;
             case 0x210d:
             case 0x210f:

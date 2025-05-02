@@ -826,7 +826,7 @@ OP(rol) {
     } else {
         bool carry = get_status_bit(STATUS_CARRY);
         uint32_t addr = resolve_addr(mode);
-        if (cpu.emulation_mode) {
+        if (get_status_bit(STATUS_MEMNARROW)) {
             set_status_bit(STATUS_CARRY,
                            read_8(U24_LOSHORT(addr), U24_HIBYTE(addr)) & 0x80);
             uint8_t result =
@@ -860,7 +860,7 @@ OP(ror) {
     } else {
         bool carry = get_status_bit(STATUS_CARRY);
         uint32_t addr = resolve_addr(mode);
-        if (cpu.emulation_mode) {
+        if (get_status_bit(STATUS_MEMNARROW)) {
             set_status_bit(STATUS_CARRY,
                            read_8(U24_LOSHORT(addr), U24_HIBYTE(addr)) & 1);
             uint8_t result =
@@ -895,7 +895,7 @@ OP(asl) {
                                             : read_r(R_C) & 0x8000);
     } else {
         uint32_t addr = resolve_addr(mode);
-        if (cpu.emulation_mode) {
+        if (get_status_bit(STATUS_MEMNARROW)) {
             set_status_bit(STATUS_CARRY,
                            read_8(U24_LOSHORT(addr), U24_HIBYTE(addr)) & 0x80);
             uint8_t result = read_8(U24_LOSHORT(addr), U24_HIBYTE(addr)) << 1;
@@ -926,7 +926,7 @@ OP(lsr) {
                                             : read_r(R_C) & 0x8000);
     } else {
         uint32_t addr = resolve_addr(mode);
-        if (cpu.emulation_mode) {
+        if (get_status_bit(STATUS_MEMNARROW)) {
             set_status_bit(STATUS_CARRY,
                            read_8(U24_LOSHORT(addr), U24_HIBYTE(addr)) & 1);
             uint8_t result = read_8(U24_LOSHORT(addr), U24_HIBYTE(addr)) >> 1;

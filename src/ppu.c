@@ -29,7 +29,8 @@ void try_step_cpu(void) {
             push_8(cpu.p);
             cpu.pc = read_16(cpu.emulation_mode ? 0xfffa : 0xffea, 0);
             cpu.pbr = 0;
-        } else if (!get_status_bit(STATUS_IRQOFF) && cpu.irq) {
+        } else if (!get_status_bit(STATUS_IRQOFF) && cpu.irq &&
+                   !(cpu.emulation_mode && cpu.pbr != 0)) {
             if (!cpu.emulation_mode)
                 push_8(cpu.pbr);
             push_16(cpu.pc);
@@ -151,15 +152,18 @@ void fetch_tile_color_row(uint16_t tile_vram_offset, uint8_t y_offset,
         UNREACHABLE_SWITCH(bpp);
     }
 }
-/*
+
 void draw_bg1(uint16_t y, color_depth_t bpp) {
     uint32_t *target = (uint32_t *)(framebuffer + (WINDOW_WIDTH * 4 * y));
-
     uint8_t tilemap_w = ppu.bg_config[0].double_h_tilemap ? 64 : 32;
     uint8_t tilemap_h = ppu.bg_config[0].double_v_tilemap ? 64 : 32;
     uint16_t tilemap_line_pointer = ppu.bg_config[0].tilemap_addr;
-    tilemap_line_pointer +=
-        (((y + ppu.bg_config[0].v_scroll) / 8) % tilemap_h) * tilemap_w;
+    uint8_t tile_size = ppu.bg_config[0].large_characters ? 16 : 8;
+    uint8_t tile_index_v = (y + ppu.bg_config[0].v_scroll) / tile_size;
+    if(tile_index_v > 31 && tilemap_w == 64) {
+        tilemap_line_pointer += 0x1000;
+    }
+    tilemap_line_pointer += (tile_index_v % tilemap_h) * tilemap_w;
     uint16_t tilemap_line_index = 0;
 
     uint16_t tilemap_fetch[64] = {0};
@@ -172,12 +176,26 @@ void draw_bg1(uint16_t y, color_depth_t bpp) {
             tilemap_line_index %= tilemap_w;
     }
 
-    uint8_t tile_size = ppu.bg_config[0].large_characters ? 16 : 8;
     for (uint16_t x = 0; x < WINDOW_WIDTH; x++) {
         uint8_t tilemap_idx =
             ((x + ppu.bg_config[0].h_scroll) / tile_size) % 64;
+        uint8_t out[16] = {0};
+        uint8_t tile_y_off = (y + ppu.bg_config[0].v_scroll) % tile_size;
+        if (tilemap_fetch[tilemap_idx] >> 15)
+            tile_y_off = tile_size - 1 - tile_y_off;
+        uint8_t tile_x_off = (x + ppu.bg_config[0].h_scroll) % tile_size;
+        if ((tilemap_fetch[tilemap_idx] >> 14) & 1)
+            tile_x_off = tile_size - 1 - tile_x_off;
+        uint8_t palette = (tilemap_fetch[tilemap_idx] >> 10) & 0b111;
+
+        fetch_tile_color_row(ppu.bg_config[0].tiledata_addr +
+                                 (tilemap_fetch[tilemap_idx] & 0x3ff) *
+                                     ((bpp * tile_size * tile_size) / 8),
+                             tile_y_off, tile_size, tile_size, bpp, out);
+        target[x] =
+            r5g5b5_to_r8g8b8a8(ppu.cgram[palette * 16 + out[tile_x_off]]);
     }
-}*/
+}
 
 void draw_obj(uint16_t y) {
     static uint8_t size_lut[8][4] = {
@@ -272,6 +290,8 @@ void try_step_ppu(void) {
             for (uint16_t i = 0; i < 256 * 4; i++) {
                 framebuffer[(ppu.beam_y - 1) * WINDOW_WIDTH * 4 + i] = 0;
             }
+            if (ppu.bg_mode == 1)
+                draw_bg1(ppu.beam_y - 1, BPP_4);
             draw_obj(ppu.beam_y - 1);
         }
     }

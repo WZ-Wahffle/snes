@@ -73,11 +73,19 @@ void cpu_window(void) {
     ImGui::End();
 }
 
-int bg_selected = 0;
 void ppu_window(void) {
     ImGui::Begin("ppu", NULL, ImGuiWindowFlags_HorizontalScrollbar);
+    ImGui::Text("VRAM Address: 0x%04x", ppu.vram_addr);
+    ImGui::Text("VRAM Address Remapping Index: %d", ppu.address_remapping);
+    ImGui::Text("VRAM Address Increment Amount Index: %d", ppu.address_increment_amount);
+    ImGui::End();
+}
 
-    ImGui::InputInt("Channel", &bg_selected, 1, 1,
+int bg_selected = 0;
+void bg_window(void) {
+    ImGui::Begin("bg", NULL, ImGuiWindowFlags_HorizontalScrollbar);
+
+    ImGui::InputInt("BG Layer", &bg_selected, 1, 1,
                     ImGuiInputTextFlags_CharsDecimal);
     if (bg_selected > 3)
         bg_selected = 3;
@@ -90,6 +98,8 @@ void ppu_window(void) {
                 ppu.bg_config[bg_selected].tilemap_addr);
     ImGui::Text("h: %d, v: %d", ppu.bg_config[bg_selected].double_h_tilemap + 1,
                 ppu.bg_config[bg_selected].double_v_tilemap + 1);
+    ImGui::Text("X Scroll: %d", ppu.bg_config[bg_selected].h_scroll);
+    ImGui::Text("Y Scroll: %d", ppu.bg_config[bg_selected].v_scroll);
     ImGui::End();
 }
 
@@ -388,6 +398,7 @@ void cpp_imgui_render(void) {
     vram_window();
     dma_window();
     ppu_window();
+    bg_window();
     oam_lo_window();
     cpu_ram_window();
     cpu_rom_window();
