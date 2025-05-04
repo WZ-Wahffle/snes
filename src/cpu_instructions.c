@@ -199,7 +199,7 @@ OP(ldy) {
 
 OP(tya) {
     LEGALADDRMODES(AM_ACC);
-    write_r(R_C, read_r(R_Y));
+    write_r(R_C, cpu.y);
     set_status_bit(STATUS_ZERO, read_r(R_C) == 0);
     set_status_bit(STATUS_NEGATIVE, get_status_bit(STATUS_MEMNARROW)
                                         ? (read_r(R_C) & 0x80)
@@ -208,7 +208,7 @@ OP(tya) {
 
 OP(tax) {
     LEGALADDRMODES(AM_IMP);
-    write_r(R_X, read_r(R_C));
+    write_r(R_X, cpu.c);
     set_status_bit(STATUS_ZERO, read_r(R_X) == 0);
     set_status_bit(STATUS_NEGATIVE, get_status_bit(STATUS_XNARROW)
                                         ? (read_r(R_X) & 0x80)
@@ -217,7 +217,7 @@ OP(tax) {
 
 OP(txa) {
     LEGALADDRMODES(AM_IMP);
-    write_r(R_C, read_r(R_X));
+    write_r(R_C, cpu.x);
     set_status_bit(STATUS_ZERO, read_r(R_C) == 0);
     set_status_bit(STATUS_NEGATIVE, get_status_bit(STATUS_MEMNARROW)
                                         ? (read_r(R_C) & 0x80)
@@ -226,7 +226,7 @@ OP(txa) {
 
 OP(tay) {
     LEGALADDRMODES(AM_IMP);
-    write_r(R_Y, read_r(R_C));
+    write_r(R_Y, cpu.c);
     set_status_bit(STATUS_ZERO, read_r(R_Y) == 0);
     set_status_bit(STATUS_NEGATIVE, get_status_bit(STATUS_XNARROW)
                                         ? (read_r(R_Y) & 0x80)
@@ -235,7 +235,7 @@ OP(tay) {
 
 OP(txy) {
     LEGALADDRMODES(AM_IMP);
-    write_r(R_Y, read_r(R_X));
+    write_r(R_Y, cpu.x);
     set_status_bit(STATUS_ZERO, read_r(R_Y) == 0);
     set_status_bit(STATUS_NEGATIVE, get_status_bit(STATUS_XNARROW)
                                         ? (read_r(R_Y) & 0x80)
@@ -244,7 +244,7 @@ OP(txy) {
 
 OP(tyx) {
     LEGALADDRMODES(AM_IMP);
-    write_r(R_X, read_r(R_Y));
+    write_r(R_X, cpu.y);
     set_status_bit(STATUS_ZERO, read_r(R_X) == 0);
     set_status_bit(STATUS_NEGATIVE, get_status_bit(STATUS_XNARROW)
                                         ? (read_r(R_X) & 0x80)

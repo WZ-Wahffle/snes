@@ -78,6 +78,8 @@ void ppu_window(void) {
     ImGui::Text("VRAM Address: 0x%04x", ppu.vram_addr);
     ImGui::Text("VRAM Address Remapping Index: %d", ppu.address_remapping);
     ImGui::Text("VRAM Address Increment Amount Index: %d", ppu.address_increment_amount);
+    ImGui::Text("Window 1: %d-%d", ppu.window_1_l, ppu.window_1_r);
+    ImGui::Text("Window 2: %d-%d", ppu.window_2_l, ppu.window_2_r);
     ImGui::End();
 }
 
@@ -100,6 +102,7 @@ void bg_window(void) {
                 ppu.bg_config[bg_selected].double_v_tilemap + 1);
     ImGui::Text("X Scroll: %d", ppu.bg_config[bg_selected].h_scroll);
     ImGui::Text("Y Scroll: %d", ppu.bg_config[bg_selected].v_scroll);
+    ImGui::Text("Tile Size: %dpx", ppu.bg_config[bg_selected].large_characters ? 16 : 8);
     ImGui::End();
 }
 

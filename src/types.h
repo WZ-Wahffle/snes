@@ -47,6 +47,10 @@ static void log_message(log_level_t level, char *message, ...);
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define ARRAYSIZE(a) (sizeof(a) / sizeof((a)[0]))
+#define SWAP_ENDIAN(a) ((((a)>>24)&0xff) | \
+                    (((a)<<8)&0xff0000) | \
+                    (((a)>>8)&0xff00) | \
+                    (((a)<<24)&0xff000000)
 
 #define WINDOW_WIDTH 256
 #define WINDOW_HEIGHT 224
