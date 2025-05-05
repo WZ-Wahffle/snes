@@ -345,6 +345,9 @@ void cpu_execute(void) {
     case 0x0a:
         asl(AM_ACC);
         break;
+    case 0x0b:
+        phd(AM_STK);
+        break;
     case 0x0d:
         ora(AM_ABS);
         break;
@@ -402,6 +405,9 @@ void cpu_execute(void) {
     case 0x2a:
         rol(AM_ACC);
         break;
+    case 0x2b:
+        pld(AM_STK);
+        break;
     case 0x2c:
         bit(AM_ABS);
         break;
@@ -419,6 +425,9 @@ void cpu_execute(void) {
         break;
     case 0x3a:
         dec(AM_ACC);
+        break;
+    case 0x3b:
+        tsc(AM_IMP);
         break;
     case 0x3d:
         and_(AM_ABSX);
@@ -489,6 +498,9 @@ void cpu_execute(void) {
     case 0x60:
         rts(AM_IMP);
         break;
+    case 0x61:
+        adc(AM_INDX_DIR);
+        break;
     case 0x62:
         per(AM_PC_REL_L);
         break;
@@ -558,6 +570,9 @@ void cpu_execute(void) {
     case 0x88:
         dey(AM_IMP);
         break;
+    case 0x89:
+        bit(AM_IMM);
+        break;
     case 0x8a:
         txa(AM_IMP);
         break;
@@ -593,6 +608,9 @@ void cpu_execute(void) {
         break;
     case 0x99:
         sta(AM_ABSY);
+        break;
+    case 0x9a:
+        txs(AM_IMP);
         break;
     case 0x9b:
         txy(AM_IMP);

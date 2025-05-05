@@ -101,6 +101,8 @@ void cpu_window(void) {
 
     if (remove) {
         cpu_bp.erase(cpu_bp.begin() + to_remove);
+        cpu.breakpoints = cpu_bp.data();
+        cpu.breakpoints_size = cpu_bp.size();
     }
 
     ImGui::End();
@@ -108,6 +110,7 @@ void cpu_window(void) {
 
 void ppu_window(void) {
     ImGui::Begin("ppu", NULL, ImGuiWindowFlags_HorizontalScrollbar);
+    ImGui::Text("BG Mode: %d", ppu.bg_mode);
     ImGui::Text("VRAM Address: 0x%04x", ppu.vram_addr);
     ImGui::Text("VRAM Address Remapping Index: %d", ppu.address_remapping);
     ImGui::Text("VRAM Address Increment Amount Index: %d",

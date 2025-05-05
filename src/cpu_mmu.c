@@ -124,6 +124,11 @@ uint8_t mmu_read(uint16_t addr, uint8_t bank, bool log) {
                 cpu.memory.timer_has_occurred = false;
                 return ret << 7;
             }
+            case 0x4212: {
+                bool vblank = ppu.beam_y > 224;
+                bool hblank = ppu.beam_x > 278;
+                return (vblank << 7) | (hblank << 6);
+            }
             case 0x4214:
                 if (cpu.memory.divisor == 0)
                     return 0xff;
@@ -266,6 +271,8 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                 ppu.bg_config[(addr - 0x210d) / 2].h_scroll =
                     (value << 8) | (ppu.bg_scroll_latch & ~7) |
                     ((ppu.bg_config[(addr - 0x210d) / 2].h_scroll >> 8) & 7);
+
+                ppu.bg_config[(addr - 0x210d) / 2].h_scroll &= 0x3ff;
                 ppu.bg_scroll_latch = value;
                 break;
             case 0x210e:
@@ -274,6 +281,7 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
             case 0x2114:
                 ppu.bg_config[(addr - 0x210e) / 2].v_scroll =
                     (value << 8) | ppu.bg_scroll_latch;
+                ppu.bg_config[(addr - 0x210e) / 2].v_scroll &= 0x3ff;
                 ppu.bg_scroll_latch = value;
                 break;
             case 0x2115:
