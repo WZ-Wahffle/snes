@@ -18,8 +18,12 @@ void try_step_cpu(void) {
     static bool prev_vblank = false;
     if (cpu.remaining_clocks > 0) {
         cpu_execute();
-        if (cpu.breakpoint_valid && TO_U24(cpu.pc, cpu.pbr) == cpu.breakpoint) {
-            cpu.state = STATE_STOPPED;
+        for (uint32_t i = 0; i < cpu.breakpoints_size; i++) {
+            if (cpu.breakpoints[i].valid && cpu.breakpoints[i].execute &&
+                TO_U24(cpu.pc, cpu.pbr) == cpu.breakpoints[i].line) {
+                cpu.state = STATE_STOPPED;
+                break;
+            }
         }
         bool curr_vblank =
             cpu.vblank_nmi_enable && cpu.memory.vblank_has_occurred;
@@ -298,10 +302,10 @@ void draw_bg2(uint16_t y, color_depth_t bpp, uint8_t low_prio,
             !ppu.bg_config[1].window_2_enable) {
             blocked = false;
         } else if (ppu.bg_config[1].window_1_enable &&
-            !ppu.bg_config[1].window_2_enable) {
+                   !ppu.bg_config[1].window_2_enable) {
             blocked = window_1;
-            } else if (!ppu.bg_config[1].window_1_enable &&
-                ppu.bg_config[1].window_2_enable) {
+        } else if (!ppu.bg_config[1].window_1_enable &&
+                   ppu.bg_config[1].window_2_enable) {
             blocked = window_2;
         } else
             switch (ppu.bg_config[1].mask_logic) {
@@ -390,10 +394,10 @@ void draw_bg3(uint16_t y, color_depth_t bpp, uint8_t low_prio,
             !ppu.bg_config[2].window_2_enable) {
             blocked = false;
         } else if (ppu.bg_config[2].window_1_enable &&
-            !ppu.bg_config[2].window_2_enable) {
+                   !ppu.bg_config[2].window_2_enable) {
             blocked = window_1;
-            } else if (!ppu.bg_config[2].window_1_enable &&
-                ppu.bg_config[2].window_2_enable) {
+        } else if (!ppu.bg_config[2].window_1_enable &&
+                   ppu.bg_config[2].window_2_enable) {
             blocked = window_2;
         } else
             switch (ppu.bg_config[2].mask_logic) {
@@ -429,6 +433,8 @@ void draw_bg3(uint16_t y, color_depth_t bpp, uint8_t low_prio,
         }
     }
 }
+
+// TODO: 0x7e43c7 is written to, 0x7e43ff is not. WHY????
 
 void draw_obj(uint16_t y) {
     static uint8_t size_lut[8][4] = {
@@ -612,7 +618,8 @@ void try_step_ppu(void) {
             if (ppu.bg_mode == 1) {
                 draw_bg1(ppu.beam_y - 1, BPP_4, 7, 10);
                 draw_bg2(ppu.beam_y - 1, BPP_4, 6, 9);
-                draw_bg3(ppu.beam_y - 1, BPP_2, 1, ppu.mode_1_bg3_prio ? 12 : 4);
+                draw_bg3(ppu.beam_y - 1, BPP_2, 1,
+                         ppu.mode_1_bg3_prio ? 12 : 4);
             }
             draw_obj(ppu.beam_y - 1);
         }
@@ -699,9 +706,11 @@ void ui(void) {
         }
 
         UpdateTexture(texture, framebuffer);
+        uint8_t brightness = 0xff * (ppu.brightness / 16.f);
         DrawTexturePro(texture, (Rectangle){0, 0, WINDOW_WIDTH, WINDOW_HEIGHT},
                        (Rectangle){0, 0, GetScreenWidth(), GetScreenHeight()},
-                       (Vector2){0, 0}, 0.0f, WHITE);
+                       (Vector2){0, 0}, 0.0f,
+                       (Color){brightness, brightness, brightness, 0xff});
 
         if (IsKeyPressed(KEY_TAB)) {
             view_debug_ui = !view_debug_ui;

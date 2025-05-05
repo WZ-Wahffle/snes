@@ -32,6 +32,13 @@ uint16_t read_r(r_t reg) {
 }
 
 uint8_t read_8(uint16_t addr, uint8_t bank) {
+    for (uint32_t i = 0; i < cpu.breakpoints_size; i++) {
+        if (cpu.breakpoints[i].valid && cpu.breakpoints[i].read &&
+            TO_U24(addr, bank) == cpu.breakpoints[i].line) {
+            cpu.state = STATE_STOPPED;
+            break;
+        }
+    }
     return mmu_read(addr, bank, true);
 }
 
@@ -86,6 +93,13 @@ void write_r(r_t reg, uint16_t val) {
 }
 
 void write_8(uint16_t addr, uint8_t bank, uint8_t val) {
+    for (uint32_t i = 0; i < cpu.breakpoints_size; i++) {
+        if (cpu.breakpoints[i].valid && cpu.breakpoints[i].write &&
+            TO_U24(addr, bank) == cpu.breakpoints[i].line) {
+            cpu.state = STATE_STOPPED;
+            break;
+        }
+    }
     mmu_write(addr, bank, val, true);
 }
 

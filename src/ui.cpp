@@ -1,5 +1,7 @@
 #include "ui.h"
 #include "types.h"
+#include <string>
+#include <vector>
 #define NO_FONT_AWESOME
 #include "imgui.h"
 #include "rlImGui.h"
@@ -8,7 +10,7 @@ extern cpu_t cpu;
 extern ppu_t ppu;
 extern spc_t spc;
 
-char bp_inter[7] = {0};
+std::vector<breakpoint_t> cpu_bp;
 void cpu_window(void) {
     ImGui::Begin("cpu", NULL, ImGuiWindowFlags_HorizontalScrollbar);
     ImGui::Text("PC: 0x%04x Opcode: 0x%02x", cpu.pc,
@@ -50,24 +52,55 @@ void cpu_window(void) {
     ImGui::Text("Data Bank: 0x%02x", cpu.dbr);
 
     ImGui::NewLine();
-
-    ImGui::Text("Breakpoint: 0x");
-    ImGui::SameLine();
-    ImGui::PushItemWidth(4 * ImGui::GetFontSize());
-    ImGui::InputText("##bpin", bp_inter, 7);
-    ImGui::PopItemWidth();
-    cpu.breakpoint_valid = true;
-    for (char &c : bp_inter) {
-        if ((c < '0' || c > '9') && (c < 'a' || c > 'f') &&
-            (c < 'A' || c > 'F'))
-            cpu.breakpoint_valid = false;
-        break;
+    if (ImGui::Button("+##cpubpadd")) {
+        cpu_bp.push_back(breakpoint_t{0, {0}, 0, 0, 0, 0});
+        cpu.breakpoints = cpu_bp.data();
+        cpu.breakpoints_size = cpu_bp.size();
     }
-    if (!cpu.breakpoint_valid) {
+    bool remove = false;
+    uint32_t to_remove = 0;
+    for (uint32_t i = 0; i < cpu_bp.size(); i++) {
+        ImGui::Text("0x");
         ImGui::SameLine();
-        ImGui::TextColored(ImVec4{0xff, 0, 0, 0xff}, "Invalid!");
-    } else {
-        cpu.breakpoint = strtoul(bp_inter, NULL, 16);
+        ImGui::PushItemWidth(4 * ImGui::GetFontSize());
+        ImGui::InputText((std::string("##cpubpin") + std::to_string(i)).c_str(),
+                         cpu_bp[i].bp_inter, 7);
+        ImGui::PopItemWidth();
+        cpu_bp[i].valid = true;
+        for (char &c : cpu_bp[i].bp_inter) {
+            if ((c < '0' || c > '9') && (c < 'a' || c > 'f') &&
+                (c < 'A' || c > 'F'))
+                cpu_bp[i].valid = false;
+            break;
+        }
+        if (!cpu_bp[i].valid) {
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4{0xff, 0, 0, 0xff}, "Invalid!");
+            ImGui::SameLine();
+        } else {
+            cpu_bp[i].line = strtoul(cpu_bp[i].bp_inter, NULL, 16);
+            ImGui::SameLine();
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() +
+                                 ImGui::CalcTextSize(" Invalid!").x);
+        }
+        ImGui::Checkbox((std::string("R##cpubpr") + std::to_string(i)).c_str(),
+                        &cpu_bp[i].read);
+        ImGui::SameLine();
+        ImGui::Checkbox((std::string("W##cpubpw") + std::to_string(i)).c_str(),
+                        &cpu_bp[i].write);
+        ImGui::SameLine();
+        ImGui::Checkbox((std::string("X##cpubpx") + std::to_string(i)).c_str(),
+                        &cpu_bp[i].execute);
+        ImGui::SameLine();
+        if (ImGui::Button(
+                (std::string("-##cpubprm") + std::to_string(i)).c_str())) {
+            remove = true;
+            to_remove = i;
+        }
+    }
+
+    if (remove) {
+        cpu_bp.erase(cpu_bp.begin() + to_remove);
     }
 
     ImGui::End();
@@ -77,7 +110,8 @@ void ppu_window(void) {
     ImGui::Begin("ppu", NULL, ImGuiWindowFlags_HorizontalScrollbar);
     ImGui::Text("VRAM Address: 0x%04x", ppu.vram_addr);
     ImGui::Text("VRAM Address Remapping Index: %d", ppu.address_remapping);
-    ImGui::Text("VRAM Address Increment Amount Index: %d", ppu.address_increment_amount);
+    ImGui::Text("VRAM Address Increment Amount Index: %d",
+                ppu.address_increment_amount);
     ImGui::Text("Window 1: %d-%d", ppu.window_1_l, ppu.window_1_r);
     ImGui::Text("Window 2: %d-%d", ppu.window_2_l, ppu.window_2_r);
     ImGui::End();
@@ -102,7 +136,12 @@ void bg_window(void) {
                 ppu.bg_config[bg_selected].double_v_tilemap + 1);
     ImGui::Text("X Scroll: %d", ppu.bg_config[bg_selected].h_scroll);
     ImGui::Text("Y Scroll: %d", ppu.bg_config[bg_selected].v_scroll);
-    ImGui::Text("Tile Size: %dpx", ppu.bg_config[bg_selected].large_characters ? 16 : 8);
+    ImGui::Text("Tile Size: %dpx",
+                ppu.bg_config[bg_selected].large_characters ? 16 : 8);
+    ImGui::Text("Window 1 %sabled",
+                ppu.bg_config[bg_selected].window_1_enable ? "en" : "dis");
+    ImGui::Text("Window 2 %sabled",
+                ppu.bg_config[bg_selected].window_2_enable ? "en" : "dis");
     ImGui::End();
 }
 
@@ -136,7 +175,8 @@ void vram_window(void) {
 void oam_window(void) {
     ImGui::Begin("oam", NULL, ImGuiWindowFlags_HorizontalScrollbar);
     ImGui::Text("DEF Nametable: 0x%04x", ppu.obj_name_base_address << 14);
-    ImGui::Text("ALT Nametable: 0x%04x", (ppu.obj_name_base_address << 14) + ((ppu.obj_name_select + 1) << 13));
+    ImGui::Text("ALT Nametable: 0x%04x", (ppu.obj_name_base_address << 14) +
+                                             ((ppu.obj_name_select + 1) << 13));
     ImGui::Text("Sprite size index: %d", ppu.obj_sprite_size);
     if (ImGui::BeginTable("##oam", 6,
                           ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
@@ -395,6 +435,8 @@ void cpp_init(void) {
     rlImGuiSetup(true);
     ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     ImGui::GetIO().FontGlobalScale *= 2;
+    cpu.breakpoints = cpu_bp.data();
+    cpu.breakpoints_size = cpu_bp.size();
 }
 
 void cpp_imgui_render(void) {

@@ -139,6 +139,13 @@ typedef struct {
 } cart_hash_t;
 
 typedef struct {
+    uint32_t line;
+    char bp_inter[7];
+    bool valid;
+    bool read, write, execute;
+} breakpoint_t;
+
+typedef struct {
     uint8_t *rom;
     uint32_t rom_size;
     uint8_t *sram;
@@ -185,9 +192,10 @@ typedef struct {
     bool irq;
 
     emu_state_t state;
-    bool breakpoint_valid;
-    uint32_t breakpoint;
     double speed;
+
+    breakpoint_t* breakpoints;
+    uint32_t breakpoints_size;
 
     uint8_t opcode_history[0x10000];
     uint32_t pc_history[0x10000];
