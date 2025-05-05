@@ -168,7 +168,7 @@ void draw_bg(uint8_t bg_idx, uint16_t y, color_depth_t bpp, uint8_t low_prio,
     if (tile_index_v > 31 && tilemap_w == 64) {
         tilemap_line_pointer += 0x1000;
     }
-    tilemap_line_pointer += (tile_index_v % 32) * tilemap_w;
+    tilemap_line_pointer += (tile_index_v % 32) * 2 * 32;
     uint16_t tilemap_line_index = 0;
 
     uint16_t tilemap_fetch[64] = {0};

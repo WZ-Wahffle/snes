@@ -271,8 +271,6 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                 ppu.bg_config[(addr - 0x210d) / 2].h_scroll =
                     (value << 8) | (ppu.bg_scroll_latch & ~7) |
                     ((ppu.bg_config[(addr - 0x210d) / 2].h_scroll >> 8) & 7);
-
-                ppu.bg_config[(addr - 0x210d) / 2].h_scroll &= 0x3ff;
                 ppu.bg_scroll_latch = value;
                 break;
             case 0x210e:
@@ -281,7 +279,6 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
             case 0x2114:
                 ppu.bg_config[(addr - 0x210e) / 2].v_scroll =
                     (value << 8) | ppu.bg_scroll_latch;
-                ppu.bg_config[(addr - 0x210e) / 2].v_scroll &= 0x3ff;
                 ppu.bg_scroll_latch = value;
                 break;
             case 0x2115:
