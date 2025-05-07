@@ -190,6 +190,8 @@ typedef struct {
     uint8_t timer_irq;
     bool emulation_mode;
     bool irq;
+    bool brk;
+    bool cop;
 
     emu_state_t state;
     double speed;

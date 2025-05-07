@@ -34,6 +34,28 @@ void try_step_cpu(void) {
             push_8(cpu.p);
             cpu.pc = read_16(cpu.emulation_mode ? 0xfffa : 0xffea, 0);
             cpu.pbr = 0;
+        } else if (cpu.brk) {
+            cpu.brk = false;
+            if (!cpu.emulation_mode)
+                push_8(cpu.pbr);
+            push_16(cpu.pc + 1);
+            if (cpu.emulation_mode)
+                set_status_bit(STATUS_BREAK, true);
+            push_8(cpu.p);
+            set_status_bit(STATUS_IRQOFF, true);
+            set_status_bit(STATUS_BCD, false);
+            cpu.pc = read_16(cpu.emulation_mode ? 0xfffe : 0xffe6, 0);
+            cpu.pbr = 0;
+        } else if (cpu.cop) {
+            cpu.cop = false;
+            if (!cpu.emulation_mode)
+                push_8(cpu.pbr);
+            push_16(cpu.pc + 1);
+            push_8(cpu.p);
+            set_status_bit(STATUS_IRQOFF, true);
+            set_status_bit(STATUS_BCD, false);
+            cpu.pc = read_16(cpu.emulation_mode ? 0xfff4 : 0xffe4, 0);
+            cpu.pbr = 0;
         } else if (!get_status_bit(STATUS_IRQOFF) && cpu.irq &&
                    !(cpu.emulation_mode && cpu.pbr != 0)) {
             if (!cpu.emulation_mode)
@@ -159,7 +181,10 @@ void fetch_tile_color_row(uint16_t tile_vram_offset, uint8_t y_offset,
 }
 
 void draw_bg(uint8_t bg_idx, uint16_t y, color_depth_t bpp, uint8_t low_prio,
-              uint8_t high_prio) {
+             uint8_t high_prio) {
+    if (!ppu.bg_config[bg_idx].main_screen_enable &&
+        !ppu.bg_config[bg_idx].sub_screen_enable)
+        return;
     uint32_t *target = (uint32_t *)(framebuffer + (WINDOW_WIDTH * 4 * y));
     uint8_t tilemap_w = ppu.bg_config[bg_idx].double_h_tilemap ? 64 : 32;
     uint16_t tilemap_line_pointer = ppu.bg_config[bg_idx].tilemap_addr;
@@ -200,20 +225,22 @@ void draw_bg(uint8_t bg_idx, uint16_t y, color_depth_t bpp, uint8_t low_prio,
         bool prio = tilemap_fetch[tilemap_idx] & 0x2000;
 
         bool window_1 = IN_INTERVAL(x, ppu.window_1_l, ppu.window_1_r);
-        if (ppu.bg_config[bg_idx].window_1_enable && ppu.window_1_l < ppu.window_1_r)
+        if (ppu.bg_config[bg_idx].window_1_enable &&
+            ppu.window_1_l < ppu.window_1_r)
             window_1 ^= ppu.bg_config[bg_idx].window_1_invert;
         bool window_2 = IN_INTERVAL(x, ppu.window_2_l, ppu.window_2_r);
-        if (ppu.bg_config[bg_idx].window_2_enable && ppu.window_2_l < ppu.window_2_r)
+        if (ppu.bg_config[bg_idx].window_2_enable &&
+            ppu.window_2_l < ppu.window_2_r)
             window_2 ^= ppu.bg_config[bg_idx].window_2_invert;
         bool blocked;
         if (!ppu.bg_config[bg_idx].window_1_enable &&
             !ppu.bg_config[bg_idx].window_2_enable) {
             blocked = false;
         } else if (ppu.bg_config[bg_idx].window_1_enable &&
-            !ppu.bg_config[bg_idx].window_2_enable) {
+                   !ppu.bg_config[bg_idx].window_2_enable) {
             blocked = window_1;
-            } else if (!ppu.bg_config[bg_idx].window_1_enable &&
-                ppu.bg_config[bg_idx].window_2_enable) {
+        } else if (!ppu.bg_config[bg_idx].window_1_enable &&
+                   ppu.bg_config[bg_idx].window_2_enable) {
             blocked = window_2;
         } else
             switch (ppu.bg_config[bg_idx].mask_logic) {
@@ -235,7 +262,8 @@ void draw_bg(uint8_t bg_idx, uint16_t y, color_depth_t bpp, uint8_t low_prio,
 
         if (!blocked &&
             priority[y * WINDOW_WIDTH + x] < (prio ? high_prio : low_prio)) {
-            uint8_t tile_x_off = (x + ppu.bg_config[bg_idx].h_scroll) % tile_size;
+            uint8_t tile_x_off =
+                (x + ppu.bg_config[bg_idx].h_scroll) % tile_size;
             if ((tilemap_fetch[tilemap_idx] >> 14) & 1)
                 tile_x_off = tile_size - 1 - tile_x_off;
             uint8_t palette = (tilemap_fetch[tilemap_idx] >> 10) & 0b111;
@@ -431,7 +459,7 @@ void try_step_ppu(void) {
                     0;
                 priority[(ppu.beam_y - 1) * WINDOW_WIDTH + i] = 0;
             }
-            if(ppu.bg_mode == 0) {
+            if (ppu.bg_mode == 0) {
                 draw_bg(0, ppu.beam_y - 1, BPP_2, 7, 10);
                 draw_bg(1, ppu.beam_y - 1, BPP_2, 6, 9);
                 draw_bg(2, ppu.beam_y - 1, BPP_2, 1, 4);
@@ -440,7 +468,7 @@ void try_step_ppu(void) {
                 draw_bg(0, ppu.beam_y - 1, BPP_4, 7, 10);
                 draw_bg(1, ppu.beam_y - 1, BPP_4, 6, 9);
                 draw_bg(2, ppu.beam_y - 1, BPP_2, 1,
-                         ppu.mode_1_bg3_prio ? 12 : 4);
+                        ppu.mode_1_bg3_prio ? 12 : 4);
             }
             draw_obj(ppu.beam_y - 1);
         }
@@ -450,6 +478,7 @@ void try_step_ppu(void) {
 void ui(void) {
     SetTraceLogLevel(LOG_ERROR);
     SetTargetFPS(60);
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(WINDOW_WIDTH * 4, WINDOW_HEIGHT * 4, "snes");
     Image framebuffer_image = {framebuffer, WINDOW_WIDTH, WINDOW_HEIGHT, 1,
                                PIXELFORMAT_UNCOMPRESSED_R8G8B8A8};

@@ -22,6 +22,8 @@ uint16_t read_r(r_t reg) {
         }
         return cpu.y;
     case R_S:
+        if (cpu.emulation_mode)
+            cpu.s = TO_U16(U16_LOBYTE(cpu.s), 1);
         return cpu.s;
     case R_D:
         return cpu.d;
@@ -47,12 +49,33 @@ uint8_t read_8_no_log(uint16_t addr, uint8_t bank) {
 }
 
 uint16_t read_16(uint16_t addr, uint8_t bank) {
-    return TO_U16(read_8(addr, bank), read_8(addr + 1, bank));
+    return TO_U16(read_8(addr, bank),
+                  read_8(addr + 1, bank + (addr == 0xffff)));
 }
 
 uint32_t read_24(uint16_t addr, uint8_t bank) {
-    return TO_U24(read_16(addr, bank), read_8(addr + 2, bank));
+    return TO_U24(read_16(addr, bank),
+                  read_8(addr + 2, bank + (addr > 0xfffd)));
 }
+
+uint16_t read_16_dir(uint16_t addr, bool hack_flag, bool new_instruction) {
+    if (!new_instruction && hack_flag && cpu.emulation_mode &&
+        cpu.d % 0x100 != 0) {
+        return TO_U16(read_8(addr + cpu.d, 0),
+                      read_8(TO_U16(U16_LOBYTE(addr + cpu.d + 1),
+                                    U16_HIBYTE(addr + cpu.d)),
+                             0));
+    }
+    if (cpu.emulation_mode && cpu.d % 0x100 == 0) {
+        uint16_t t_lo = TO_U16(U16_LOBYTE(cpu.d + addr), U16_HIBYTE(cpu.d));
+        uint16_t t_hi = TO_U16(U16_LOBYTE(cpu.d + addr + 1), U16_HIBYTE(cpu.d));
+        return TO_U16(read_8(t_lo, 0), read_8(t_hi, 0));
+    } else {
+        return read_16(addr + cpu.d, 0);
+    }
+}
+
+uint32_t read_24_dir(uint16_t addr) { return read_24(addr + cpu.d, 0); }
 
 void write_r(r_t reg, uint16_t val) {
     switch (reg) {
@@ -85,6 +108,8 @@ void write_r(r_t reg, uint16_t val) {
         break;
     case R_S:
         cpu.s = val;
+        if (cpu.emulation_mode)
+            cpu.s = TO_U16(U16_LOBYTE(cpu.s), 1);
         break;
     case R_D:
         cpu.d = val;
@@ -105,7 +130,7 @@ void write_8(uint16_t addr, uint8_t bank, uint8_t val) {
 
 void write_16(uint16_t addr, uint8_t bank, uint16_t val) {
     write_8(addr, bank, U16_LOBYTE(val));
-    write_8(addr + 1, bank, U16_HIBYTE(val));
+    write_8(addr + 1, bank + (addr == 0xffff), U16_HIBYTE(val));
 }
 
 uint8_t next_8(void) { return read_8(cpu.pc++, cpu.pbr); }
@@ -139,7 +164,10 @@ bool get_status_bit(status_bit_t bit) {
     return cpu.p & (1 << bit);
 }
 
-void push_8(uint8_t val) { write_8(cpu.s--, 0, val); }
+void push_8(uint8_t val) {
+    write_8(read_r(R_S), 0, val);
+    cpu.s--;
+}
 void push_16(uint16_t val) {
     push_8(U16_HIBYTE(val));
     push_8(U16_LOBYTE(val));
@@ -148,7 +176,10 @@ void push_24(uint32_t val) {
     push_8(U24_HIBYTE(val));
     push_16(U24_LOSHORT(val));
 }
-uint8_t pop_8(void) { return read_8(++cpu.s, 0); }
+uint8_t pop_8(void) {
+    cpu.s++;
+    return read_8(read_r(R_S), 0);
+}
 uint16_t pop_16(void) {
     uint8_t lsb = pop_8();
     return TO_U16(lsb, pop_8());
@@ -187,28 +218,29 @@ uint32_t resolve_addr(addressing_mode_t mode) {
         ret = next_24();
         break;
     case AM_INDX_DIR:
-        ret = TO_U24(read_16(next_8() + read_r(R_D) + read_r(R_X), 0), cpu.dbr);
+        ret = TO_U24(read_16_dir(next_8() + read_r(R_X), true, false), cpu.dbr);
         break;
-    case AM_ZBKX_DIR:
-        ret = TO_U24(next_8() + read_r(R_D) + read_r(R_X), 0);
+    case AM_ZBKX_DIR: // needs dir
+        ret = TO_U24(next_8() + read_r(R_X), 0);
         break;
-    case AM_ZBKY_DIR:
-        ret = TO_U24(next_8() + read_r(R_D) + read_r(R_Y), 0);
+    case AM_ZBKY_DIR: // needs dir
+        ret = TO_U24(next_8() + read_r(R_Y), 0);
         break;
     case AM_INDY_DIR:
-        ret = TO_U24(read_16(next_8() + read_r(R_D), 0), cpu.dbr) + read_r(R_Y);
+        ret =
+            TO_U24(read_16_dir(next_8(), false, false), cpu.dbr) + read_r(R_Y);
         break;
     case AM_INDY_DIR_L:
-        ret = read_24(next_8() + read_r(R_D), 0) + read_r(R_Y);
+        ret = read_24_dir(next_8()) + read_r(R_Y);
         break;
     case AM_IND_DIR_L:
-        ret = read_24(next_8() + read_r(R_D), 0);
+        ret = read_24_dir(next_8());
         break;
     case AM_IND_DIR:
-        ret = TO_U24(read_16(next_8() + read_r(R_D), 0), cpu.dbr);
+        ret = TO_U24(read_16_dir(next_8(), false, false), cpu.dbr);
         break;
-    case AM_DIR:
-        ret = next_8() + read_r(R_D);
+    case AM_DIR: // needs dir
+        ret = next_8();
         break;
     case AM_PC_REL_L:
         ret = cpu.pc + (int16_t)next_16() + 2;
@@ -253,7 +285,18 @@ uint16_t resolve_read16(addressing_mode_t mode, bool respect_x,
         uint32_t addr = resolve_addr(mode);
         if ((get_status_bit(STATUS_XNARROW) && respect_x) ||
             (get_status_bit(STATUS_MEMNARROW) && respect_m)) {
+            if (mode & (AM_ZBKX_DIR | AM_ZBKY_DIR | AM_DIR)) {
+                if (cpu.emulation_mode && cpu.d % 256 == 0) {
+                    return read_8(
+                        TO_U16(U16_LOBYTE(addr + cpu.d), U16_HIBYTE(cpu.d)), 0);
+                }
+                return read_8(U24_LOSHORT(addr + cpu.d), 0);
+            }
             return read_8(U24_LOSHORT(addr), U24_HIBYTE(addr));
+        }
+
+        if (mode & (AM_ZBKX_DIR | AM_ZBKY_DIR | AM_DIR)) {
+            return read_16_dir(U24_LOSHORT(addr), false, false);
         }
         return read_16(U24_LOSHORT(addr), U24_HIBYTE(addr));
     }
@@ -278,10 +321,25 @@ uint16_t resolve_read8(addressing_mode_t mode) {
     case AM_ABS:
     case AM_ABSX:
     case AM_ABSY:
+    case AM_ABS_L:
     case AM_ABSX_L:
     case AM_DIR:
-    case AM_ZBKX_DIR: {
+    case AM_IND_DIR:
+    case AM_ZBKX_DIR:
+    case AM_INDX_DIR:
+    case AM_INDY_DIR:
+    case AM_INDY_DIR_L:
+    case AM_STK_REL:
+    case AM_IND_DIR_L:
+    case AM_STK_REL_INDY: {
         uint32_t addr = resolve_addr(mode);
+        if (mode & (AM_ZBKX_DIR | AM_ZBKY_DIR | AM_DIR)) {
+            if (cpu.emulation_mode && cpu.d % 256 == 0) {
+                return read_8(
+                    TO_U16(U16_LOBYTE(addr + cpu.d), U16_HIBYTE(cpu.d)), 0);
+            }
+            return read_8(U24_LOSHORT(cpu.d + addr), 0);
+        }
         return read_8(U24_LOSHORT(addr), U24_HIBYTE(addr));
     }
     default:
@@ -324,6 +382,12 @@ void cpu_execute(void) {
     // factor of 6
     cpu.remaining_clocks -= 6 * cpu_cycle_counts[opcode];
     switch (opcode) {
+    case 0x00:
+        brk(AM_IMP);
+        break;
+    case 0x02:
+        cop(AM_IMP);
+        break;
     case 0x04:
         tsb(AM_DIR);
         break;
@@ -360,6 +424,9 @@ void cpu_execute(void) {
     case 0x14:
         trb(AM_DIR);
         break;
+    case 0x16:
+        asl(AM_ZBKX_DIR);
+        break;
     case 0x18:
         clc(AM_IMP);
         break;
@@ -384,8 +451,14 @@ void cpu_execute(void) {
     case 0x20:
         jsr(AM_ABS);
         break;
+    case 0x21:
+        and_(AM_INDX_DIR);
+        break;
     case 0x22:
         jsl(AM_ABS_L);
+        break;
+    case 0x23:
+        and_(AM_STK_REL);
         break;
     case 0x24:
         bit(AM_DIR);
@@ -395,6 +468,9 @@ void cpu_execute(void) {
         break;
     case 0x26:
         rol(AM_DIR);
+        break;
+    case 0x27:
+        and_(AM_IND_DIR_L);
         break;
     case 0x28:
         plp(AM_STK);
@@ -414,8 +490,29 @@ void cpu_execute(void) {
     case 0x2d:
         and_(AM_ABS);
         break;
+    case 0x2f:
+        and_(AM_ABS_L);
+        break;
     case 0x30:
         bmi(AM_PC_REL);
+        break;
+    case 0x31:
+        and_(AM_INDY_DIR);
+        break;
+    case 0x32:
+        and_(AM_IND_DIR);
+        break;
+    case 0x33:
+        and_(AM_STK_REL_INDY);
+        break;
+    case 0x34:
+        bit(AM_ZBKX_DIR);
+        break;
+    case 0x35:
+        and_(AM_ZBKX_DIR);
+        break;
+    case 0x37:
+        and_(AM_INDY_DIR_L);
         break;
     case 0x38:
         sec(AM_IMP);
@@ -428,6 +525,9 @@ void cpu_execute(void) {
         break;
     case 0x3b:
         tsc(AM_IMP);
+        break;
+    case 0x3c:
+        bit(AM_ABSX);
         break;
     case 0x3d:
         and_(AM_ABSX);
@@ -504,11 +604,17 @@ void cpu_execute(void) {
     case 0x62:
         per(AM_PC_REL_L);
         break;
+    case 0x63:
+        adc(AM_STK_REL);
+        break;
     case 0x64:
         stz(AM_DIR);
         break;
     case 0x65:
         adc(AM_DIR);
+        break;
+    case 0x67:
+        adc(AM_IND_DIR_L);
         break;
     case 0x68:
         pla(AM_STK);
@@ -525,14 +631,29 @@ void cpu_execute(void) {
     case 0x6d:
         adc(AM_ABS);
         break;
+    case 0x6f:
+        adc(AM_ABS_L);
+        break;
     case 0x70:
         bvs(AM_PC_REL);
+        break;
+    case 0x71:
+        adc(AM_INDY_DIR);
+        break;
+    case 0x72:
+        adc(AM_IND_DIR);
+        break;
+    case 0x73:
+        adc(AM_STK_REL_INDY);
         break;
     case 0x74:
         stz(AM_ZBKX_DIR);
         break;
     case 0x75:
         adc(AM_ZBKX_DIR);
+        break;
+    case 0x77:
+        adc(AM_INDY_DIR_L);
         break;
     case 0x78:
         sei(AM_IMP);
@@ -554,6 +675,9 @@ void cpu_execute(void) {
         break;
     case 0x80:
         bra(AM_PC_REL);
+        break;
+    case 0x82:
+        brl(AM_PC_REL_L);
         break;
     case 0x84:
         sty(AM_DIR);
@@ -690,6 +814,9 @@ void cpu_execute(void) {
     case 0xb7:
         lda(AM_INDY_DIR_L);
         break;
+    case 0xb8:
+        clv(AM_IMP);
+        break;
     case 0xb9:
         lda(AM_ABSY);
         break;
@@ -711,8 +838,14 @@ void cpu_execute(void) {
     case 0xc0:
         cpy(AM_IMM);
         break;
+    case 0xc1:
+        cmp(AM_INDX_DIR);
+        break;
     case 0xc2:
         rep(AM_IMM);
+        break;
+    case 0xc3:
+        cmp(AM_STK_REL);
         break;
     case 0xc4:
         cpy(AM_DIR);
@@ -722,6 +855,9 @@ void cpu_execute(void) {
         break;
     case 0xc6:
         dec(AM_DIR);
+        break;
+    case 0xc7:
+        cmp(AM_IND_DIR_L);
         break;
     case 0xc8:
         iny(AM_IMP);
@@ -741,8 +877,20 @@ void cpu_execute(void) {
     case 0xce:
         dec(AM_ABS);
         break;
+    case 0xcf:
+        cmp(AM_ABS_L);
+        break;
     case 0xd0:
         bne(AM_PC_REL);
+        break;
+    case 0xd1:
+        cmp(AM_INDY_DIR);
+        break;
+    case 0xd2:
+        cmp(AM_IND_DIR);
+        break;
+    case 0xd3:
+        cmp(AM_STK_REL_INDY);
         break;
     case 0xd5:
         cmp(AM_ZBKX_DIR);
@@ -752,6 +900,9 @@ void cpu_execute(void) {
         break;
     case 0xd7:
         cmp(AM_INDY_DIR_L);
+        break;
+    case 0xd8:
+        cld(AM_IMP);
         break;
     case 0xd9:
         cmp(AM_ABSY);
@@ -815,6 +966,9 @@ void cpu_execute(void) {
         break;
     case 0xf6:
         inc(AM_ZBKX_DIR);
+        break;
+    case 0xf8:
+        sed(AM_IMP);
         break;
     case 0xf9:
         sbc(AM_ABSY);
