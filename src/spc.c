@@ -346,6 +346,9 @@ void spc_execute(void) {
     case 0x88:
         spc_adc(SM_IMM);
         break;
+    case 0x8b:
+        spc_dec(SM_DIR_PAGE);
+        break;
     case 0x8c:
         spc_dec(SM_ABS);
         break;
