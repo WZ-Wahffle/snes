@@ -89,6 +89,12 @@ uint8_t mmu_read(uint16_t addr, uint8_t bank, bool log) {
             return cpu.memory.ram[addr];
         } else if (addr < 0x6000) {
             switch (addr) {
+            case 0x2134:
+                return (ppu.mul_factor_1 * ppu.mul_factor_2) & 0xff;
+            case 0x2135:
+                return (ppu.mul_factor_1 * ppu.mul_factor_2) >> 8;
+            case 0x2136:
+                return (ppu.mul_factor_1 * ppu.mul_factor_2) >> 16;
             case 0x213f:
                 return 0;
             case 0x2140:
@@ -426,6 +432,34 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                 ppu.mode_7_flip_v = value & 2;
                 ppu.mode_7_non_tilemap_fill = value & 64;
                 ppu.mode_7_tilemap_repeat = value & 128;
+                break;
+            case 0x211b:
+                ppu.mul_factor_1 = (value << 8) | ppu.mode_7_latch;
+                ppu.mode_7_latch = value;
+                ppu.a_7 = ppu.mul_factor_1 / 256.f;
+                break;
+            case 0x211c:
+                ppu.mul_factor_2 = (value << 8) | ppu.mode_7_latch;
+                ppu.mode_7_latch = value;
+                ppu.b_7 = ppu.mul_factor_2 / 256.f;
+                break;
+            case 0x211d:
+                ppu.c_7_buffer = (value << 8) | ppu.mode_7_latch;
+                ppu.mode_7_latch = value;
+                ppu.c_7 = ppu.c_7_buffer / 256.f;
+                break;
+            case 0x211e:
+                ppu.d_7_buffer = (value << 8) | ppu.mode_7_latch;
+                ppu.mode_7_latch = value;
+                ppu.d_7 = ppu.d_7_buffer / 256.f;
+                break;
+            case 0x211f:
+                ppu.mode_7_center_x = (value << 8) | ppu.mode_7_latch;
+                ppu.mode_7_latch = value;
+                break;
+            case 0x2120:
+                ppu.mode_7_center_y = (value << 8) | ppu.mode_7_latch;
+                ppu.mode_7_latch = value;
                 break;
             case 0x2121:
                 ppu.cgram_addr = value;

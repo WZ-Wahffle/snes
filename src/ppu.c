@@ -92,6 +92,14 @@ void try_step_spc(void) {
         if (spc.breakpoint_valid && spc.pc == spc.breakpoint) {
             cpu.state = STATE_STOPPED;
         }
+        if(spc.brk) {
+            spc.brk = false;
+            spc_push_16(spc.pc);
+            spc_push_8(spc.p);
+            spc_set_status_bit(STATUS_BREAK, true);
+            spc_set_status_bit(STATUS_IRQOFF, false);
+            spc.pc = spc_read_16(0xffde);
+        }
     }
 }
 
@@ -203,10 +211,11 @@ void draw_bg(uint8_t bg_idx, uint16_t y, color_depth_t bpp, uint8_t low_prio,
         !ppu.bg_config[bg_idx].sub_screen_enable)
         return;
     uint16_t screen_y = y;
-    if(ppu.bg_config[bg_idx].enable_mosaic) {
+    if (ppu.bg_config[bg_idx].enable_mosaic) {
         y -= y % (ppu.mosaic_size + 1);
     }
-    uint32_t *target = (uint32_t *)(framebuffer + (WINDOW_WIDTH * 4 * screen_y));
+    uint32_t *target =
+        (uint32_t *)(framebuffer + (WINDOW_WIDTH * 4 * screen_y));
     uint8_t tilemap_w = ppu.bg_config[bg_idx].double_h_tilemap ? 64 : 32;
     uint16_t tilemap_line_pointer = ppu.bg_config[bg_idx].tilemap_addr;
     uint8_t tile_size = ppu.bg_config[bg_idx].large_characters ? 16 : 8;
@@ -242,7 +251,7 @@ void draw_bg(uint8_t bg_idx, uint16_t y, color_depth_t bpp, uint8_t low_prio,
 
     for (uint16_t screen_x = 0; screen_x < WINDOW_WIDTH; screen_x++) {
         uint16_t x = screen_x;
-        if(ppu.bg_config[bg_idx].enable_mosaic) {
+        if (ppu.bg_config[bg_idx].enable_mosaic) {
             x -= x % (ppu.mosaic_size + 1);
         }
         uint8_t tilemap_idx =
@@ -288,10 +297,12 @@ void draw_bg(uint8_t bg_idx, uint16_t y, color_depth_t bpp, uint8_t low_prio,
                 UNREACHABLE_SWITCH(ppu.bg_config[bg_idx].mask_logic);
             }
 
-        if (priority[screen_y * WINDOW_WIDTH + screen_x] < (prio ? high_prio : low_prio)) {
+        if (priority[screen_y * WINDOW_WIDTH + screen_x] <
+            (prio ? high_prio : low_prio)) {
             if (blocked) {
                 target[screen_x] = 0xff000000;
-                priority[screen_y * WINDOW_WIDTH + screen_x] = prio ? high_prio : low_prio;
+                priority[screen_y * WINDOW_WIDTH + screen_x] =
+                    prio ? high_prio : low_prio;
                 continue;
             }
 
@@ -305,7 +316,8 @@ void draw_bg(uint8_t bg_idx, uint16_t y, color_depth_t bpp, uint8_t low_prio,
                 target[screen_x] = r5g5b5_to_r8g8b8a8(
                     ppu.cgram[palette * bpp * bpp +
                               out[tilemap_idx * tile_size + tile_x_off]]);
-                priority[screen_y * WINDOW_WIDTH + screen_x] = prio ? high_prio : low_prio;
+                priority[screen_y * WINDOW_WIDTH + screen_x] =
+                    prio ? high_prio : low_prio;
             }
         }
     }
@@ -591,7 +603,7 @@ void ui(void) {
             case STATE_STOPPED:
                 // this page intentionally left blank
                 break;
-            case STATE_STEPPED:
+            case STATE_CPU_STEPPED:
                 ppu.remaining_clocks += (-cpu.remaining_clocks) + 1;
                 spc.remaining_clocks += (-cpu.remaining_clocks) + 1;
                 cpu.remaining_clocks = 1;
@@ -600,6 +612,17 @@ void ui(void) {
                 try_step_ppu();
                 while (spc.remaining_clocks > 0) {
                     try_step_spc();
+                }
+                break;
+            case STATE_SPC_STEPPED:
+                ppu.remaining_clocks += (-spc.remaining_clocks) + 1;
+                cpu.remaining_clocks += (-spc.remaining_clocks) + 1;
+                spc.remaining_clocks = 1;
+                cpu.state = STATE_STOPPED;
+                try_step_spc();
+                try_step_ppu();
+                while (spc.remaining_clocks > 0) {
+                    try_step_cpu();
                 }
                 break;
             case STATE_RUNNING:

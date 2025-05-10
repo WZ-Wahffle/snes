@@ -65,6 +65,7 @@ static cart_hash_t rom_hash_lookup[] = {
     {"Super Mario All Stars", 0x2272b1cd, LOROM},
     {"SNES CPU Test", 0x69d6bf43, LOROM},
     {"SNES CPU Test Basic", 0x7b3f6de6, LOROM},
+    {"SNES SPC Test", 0xb9a70b6a, LOROM},
     {"Earthbound", 0xb4975b60, HIROM}};
 
 int main(int argc, char **argv) {
@@ -75,6 +76,7 @@ int main(int argc, char **argv) {
            "Incorrect file extension: %s, expected .sfc",
            strrchr(argv[1], '.'));
 
+    cpu.file_name = argv[1];
     FILE *f = fopen(argv[1], "rb");
     fseek(f, 0, SEEK_END);
     uint32_t file_size = ftell(f);
@@ -143,7 +145,6 @@ int main(int argc, char **argv) {
     cpu.memory.mode = mode;
     cpu_reset();
     spc_reset();
-    cpu.state = STATE_RUNNING;
     ui();
 
     free(cpu.memory.sram);

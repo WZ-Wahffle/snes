@@ -126,7 +126,7 @@ typedef enum {
     STATUS_DIRECTPAGE = 5,
 } status_bit_t;
 
-typedef enum { STATE_STOPPED, STATE_STEPPED, STATE_RUNNING } emu_state_t;
+typedef enum { STATE_STOPPED, STATE_CPU_STEPPED, STATE_SPC_STEPPED, STATE_RUNNING } emu_state_t;
 
 typedef enum { R_C, R_X, R_Y, R_S, R_D } r_t;
 
@@ -194,10 +194,12 @@ typedef struct {
     bool brk;
     bool cop;
 
+    char *file_name;
+
     emu_state_t state;
     double speed;
 
-    breakpoint_t* breakpoints;
+    breakpoint_t *breakpoints;
     uint32_t breakpoints_size;
 
     uint8_t opcode_history[0x10000];
@@ -256,6 +258,7 @@ typedef struct {
     bool breakpoint_valid;
     uint16_t breakpoint;
     bool enable_ipl;
+    bool brk;
 } spc_t;
 
 typedef struct {
@@ -311,6 +314,11 @@ typedef struct {
 
     bool mode_7_flip_h, mode_7_flip_v, mode_7_non_tilemap_fill,
         mode_7_tilemap_repeat;
+    uint16_t mode_7_center_x, mode_7_center_y;
+    int16_t mul_factor_1, mul_factor_2;
+    uint16_t c_7_buffer, d_7_buffer;
+    float a_7, b_7, c_7, d_7;
+    uint8_t mode_7_latch;
 
     uint16_t vram_addr;
     uint8_t vram[0x10000];

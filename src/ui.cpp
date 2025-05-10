@@ -1,5 +1,6 @@
 #include "ui.h"
 #include "types.h"
+#include <fstream>
 #include <string>
 #include <vector>
 #define NO_FONT_AWESOME
@@ -10,9 +11,43 @@ extern cpu_t cpu;
 extern ppu_t ppu;
 extern spc_t spc;
 
+bool confirm_save = false, confirm_load = false;
 std::vector<breakpoint_t> cpu_bp;
 void cpu_window(void) {
     ImGui::Begin("cpu", NULL, ImGuiWindowFlags_HorizontalScrollbar);
+    if (ImGui::Button(confirm_save ? "Confirm Save##save" : "Save##save")) {
+        if (confirm_save) {
+            std::fstream f;
+            f.open(std::string(cpu.file_name) + ".wsav",
+                   f.binary | f.out | f.trunc);
+            f << cpu.memory.sram_size;
+            for (uint32_t i = 0; i < cpu.memory.sram_size; i++) {
+                f << cpu.memory.sram[i];
+            }
+            f.close();
+            confirm_save = false;
+        } else {
+            confirm_save = true;
+        }
+    }
+    ImGui::SameLine();
+    if (ImGui::Button(confirm_load ? "Confirm Load##load" : "Load##load")) {
+        if (confirm_load) {
+            std::fstream f;
+            f.open(std::string(cpu.file_name) + ".wsav", f.binary | f.in);
+            uint32_t sram_size;
+            f >> sram_size;
+            if (cpu.memory.sram_size == sram_size) {
+                for (uint32_t i = 0; i < cpu.memory.sram_size; i++) {
+                    f >> cpu.memory.sram[i];
+                }
+            }
+            f.close();
+            confirm_load = false;
+        } else {
+            confirm_load = true;
+        }
+    }
     ImGui::Text("PC: 0x%04x Opcode: 0x%02x", cpu.pc,
                 read_8_no_log(cpu.pc, cpu.pbr));
     if (ImGui::Button("Start"))
@@ -22,7 +57,7 @@ void cpu_window(void) {
         cpu.state = STATE_STOPPED;
     ImGui::SameLine();
     if (ImGui::Button("Step"))
-        cpu.state = STATE_STEPPED;
+        cpu.state = STATE_CPU_STEPPED;
     ImGui::SameLine();
     if (ImGui::Button("Dump State")) {
         for (uint16_t i = cpu.history_idx; i != cpu.history_idx - 1; i++) {
@@ -249,6 +284,14 @@ void dma_window(void) {
 char spc_bp_inter[5] = {0};
 void spc_window(void) {
     ImGui::Begin("spc", NULL, ImGuiWindowFlags_HorizontalScrollbar);
+    if (ImGui::Button("Start"))
+        cpu.state = STATE_RUNNING;
+    ImGui::SameLine();
+    if (ImGui::Button("Stop"))
+        cpu.state = STATE_STOPPED;
+    ImGui::SameLine();
+    if (ImGui::Button("Step"))
+        cpu.state = STATE_SPC_STEPPED;
     ImGui::Text("PC: 0x%04x Opcode: 0x%02x", spc.pc, spc_read_8_no_log(spc.pc));
     ImGui::Text("A: 0x%02x", spc.a);
     ImGui::Text("X: 0x%02x", spc.x);
