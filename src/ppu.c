@@ -10,6 +10,22 @@ extern spc_t spc;
 uint8_t framebuffer[WINDOW_WIDTH * WINDOW_HEIGHT * 4] = {0};
 uint8_t priority[WINDOW_WIDTH * WINDOW_HEIGHT] = {0};
 
+#define GAMEPAD_UP GAMEPAD_BUTTON_LEFT_FACE_UP
+#define GAMEPAD_DOWN GAMEPAD_BUTTON_LEFT_FACE_DOWN
+#define GAMEPAD_LEFT GAMEPAD_BUTTON_LEFT_FACE_LEFT
+#define GAMEPAD_RIGHT GAMEPAD_BUTTON_LEFT_FACE_RIGHT
+
+#define GAMEPAD_A GAMEPAD_BUTTON_RIGHT_FACE_RIGHT
+#define GAMEPAD_B GAMEPAD_BUTTON_RIGHT_FACE_DOWN
+#define GAMEPAD_X GAMEPAD_BUTTON_RIGHT_FACE_UP
+#define GAMEPAD_Y GAMEPAD_BUTTON_RIGHT_FACE_LEFT
+
+#define GAMEPAD_START GAMEPAD_BUTTON_MIDDLE_RIGHT
+#define GAMEPAD_SELECT GAMEPAD_BUTTON_MIDDLE_LEFT
+
+#define GAMEPAD_R GAMEPAD_BUTTON_RIGHT_TRIGGER_1
+#define GAMEPAD_L GAMEPAD_BUTTON_LEFT_TRIGGER_1
+
 void set_pixel(uint16_t x, uint16_t y, uint32_t color) {
     ((uint32_t *)framebuffer)[x + WINDOW_WIDTH * y] = color;
 }
@@ -80,10 +96,11 @@ void try_step_spc(void) {
 }
 
 uint32_t r5g5b5_to_r8g8b8a8(uint16_t in) {
+    float brightness = ppu.brightness / 15.f;
     uint32_t ret = 0xff000000;
-    ret |= ((in >> 0) & 0x1f) << 3;
-    ret |= ((in >> 5) & 0x1f) << 11;
-    ret |= ((in >> 10) & 0x1f) << 19;
+    ret |= (uint32_t)(((in >> 0) & 0x1f) * brightness) << 3;
+    ret |= (uint32_t)(((in >> 5) & 0x1f) * brightness) << 11;
+    ret |= (uint32_t)(((in >> 10) & 0x1f) * brightness) << 19;
     return ret;
 }
 
@@ -185,7 +202,11 @@ void draw_bg(uint8_t bg_idx, uint16_t y, color_depth_t bpp, uint8_t low_prio,
     if (!ppu.bg_config[bg_idx].main_screen_enable &&
         !ppu.bg_config[bg_idx].sub_screen_enable)
         return;
-    uint32_t *target = (uint32_t *)(framebuffer + (WINDOW_WIDTH * 4 * y));
+    uint16_t screen_y = y;
+    if(ppu.bg_config[bg_idx].enable_mosaic) {
+        y -= y % (ppu.mosaic_size + 1);
+    }
+    uint32_t *target = (uint32_t *)(framebuffer + (WINDOW_WIDTH * 4 * screen_y));
     uint8_t tilemap_w = ppu.bg_config[bg_idx].double_h_tilemap ? 64 : 32;
     uint16_t tilemap_line_pointer = ppu.bg_config[bg_idx].tilemap_addr;
     uint8_t tile_size = ppu.bg_config[bg_idx].large_characters ? 16 : 8;
@@ -219,19 +240,26 @@ void draw_bg(uint8_t bg_idx, uint16_t y, color_depth_t bpp, uint8_t low_prio,
                              out + tile_idx * tile_size);
     }
 
-    for (uint16_t x = 0; x < WINDOW_WIDTH; x++) {
+    for (uint16_t screen_x = 0; screen_x < WINDOW_WIDTH; screen_x++) {
+        uint16_t x = screen_x;
+        if(ppu.bg_config[bg_idx].enable_mosaic) {
+            x -= x % (ppu.mosaic_size + 1);
+        }
         uint8_t tilemap_idx =
             ((x + ppu.bg_config[bg_idx].h_scroll) / tile_size) % 64;
         bool prio = tilemap_fetch[tilemap_idx] & 0x2000;
 
-        bool window_1 = IN_INTERVAL(x, ppu.window_1_l, ppu.window_1_r);
-        if (ppu.bg_config[bg_idx].window_1_enable &&
-            ppu.window_1_l < ppu.window_1_r)
-            window_1 ^= ppu.bg_config[bg_idx].window_1_invert;
-        bool window_2 = IN_INTERVAL(x, ppu.window_2_l, ppu.window_2_r);
-        if (ppu.bg_config[bg_idx].window_2_enable &&
-            ppu.window_2_l < ppu.window_2_r)
-            window_2 ^= ppu.bg_config[bg_idx].window_2_invert;
+        bool window_1 = false;
+        if (ppu.bg_config[bg_idx].window_1_enable) {
+            window_1 = IN_INTERVAL(screen_x, ppu.window_1_l, ppu.window_1_r) ^
+                       ppu.bg_config[bg_idx].window_1_invert;
+        }
+        bool window_2 = false;
+        if (ppu.bg_config[bg_idx].window_2_enable) {
+            window_2 = IN_INTERVAL(screen_x, ppu.window_2_l, ppu.window_2_r) ^
+                       ppu.bg_config[bg_idx].window_2_invert;
+        }
+
         bool blocked;
         if (!ppu.bg_config[bg_idx].window_1_enable &&
             !ppu.bg_config[bg_idx].window_2_enable) {
@@ -260,8 +288,13 @@ void draw_bg(uint8_t bg_idx, uint16_t y, color_depth_t bpp, uint8_t low_prio,
                 UNREACHABLE_SWITCH(ppu.bg_config[bg_idx].mask_logic);
             }
 
-        if (!blocked &&
-            priority[y * WINDOW_WIDTH + x] < (prio ? high_prio : low_prio)) {
+        if (priority[screen_y * WINDOW_WIDTH + screen_x] < (prio ? high_prio : low_prio)) {
+            if (blocked) {
+                target[screen_x] = 0xff000000;
+                priority[screen_y * WINDOW_WIDTH + screen_x] = prio ? high_prio : low_prio;
+                continue;
+            }
+
             uint8_t tile_x_off =
                 (x + ppu.bg_config[bg_idx].h_scroll) % tile_size;
             if ((tilemap_fetch[tilemap_idx] >> 14) & 1)
@@ -269,10 +302,10 @@ void draw_bg(uint8_t bg_idx, uint16_t y, color_depth_t bpp, uint8_t low_prio,
             uint8_t palette = (tilemap_fetch[tilemap_idx] >> 10) & 0b111;
 
             if (out[tilemap_idx * tile_size + tile_x_off] != 0) {
-                target[x] = r5g5b5_to_r8g8b8a8(
+                target[screen_x] = r5g5b5_to_r8g8b8a8(
                     ppu.cgram[palette * bpp * bpp +
                               out[tilemap_idx * tile_size + tile_x_off]]);
-                priority[y * WINDOW_WIDTH + x] = prio ? high_prio : low_prio;
+                priority[screen_y * WINDOW_WIDTH + screen_x] = prio ? high_prio : low_prio;
             }
         }
     }
@@ -305,7 +338,7 @@ void draw_obj(uint16_t y) {
     // step 2: drawing (lower index, higher priority)
     uint32_t *target = (uint32_t *)(framebuffer + (WINDOW_WIDTH * 4 * y));
 
-    for (int8_t i = 127; i >= 0; i--) {
+    for (uint8_t i = 0; i < 128; i++) {
         if (ppu.oam[i].draw_this_line) {
             int16_t sp_x = ppu.oam[i].x;
             uint8_t sp_w =
@@ -326,10 +359,55 @@ void draw_obj(uint16_t y) {
             for (int16_t x_off = 0; x_off < sp_w; x_off++) {
                 int16_t x =
                     sp_x + (ppu.oam[i].flip_h ? (sp_w - (x_off + 1)) : x_off);
+
+                bool window_1 = false;
+                if (ppu.obj_window_1_enable) {
+                    window_1 = IN_INTERVAL(x, ppu.window_1_l, ppu.window_1_r) ^
+                               ppu.obj_window_1_invert;
+                }
+                bool window_2 = false;
+                if (ppu.obj_window_2_enable) {
+                    window_2 = IN_INTERVAL(x, ppu.window_2_l, ppu.window_2_r) ^
+                               ppu.obj_window_2_invert;
+                }
+
+                bool blocked;
+                if (!ppu.obj_window_1_enable && !ppu.obj_window_2_enable) {
+                    blocked = false;
+                } else if (ppu.obj_window_1_enable &&
+                           !ppu.obj_window_2_enable) {
+                    blocked = window_1;
+                } else if (!ppu.obj_window_1_enable &&
+                           ppu.obj_window_2_enable) {
+                    blocked = window_2;
+                } else
+                    switch (ppu.obj_window_mask_logic) {
+                    case 0:
+                        blocked = window_1 || window_2;
+                        break;
+                    case 1:
+                        blocked = window_1 && window_2;
+                        break;
+                    case 2:
+                        blocked = window_1 ^ window_2;
+                        break;
+                    case 3:
+                        blocked = window_1 == window_2;
+                        break;
+                    default:
+                        UNREACHABLE_SWITCH(ppu.obj_window_mask_logic);
+                    }
+
                 if (tiles[x_off] != 0 &&
                     priority[y * WINDOW_WIDTH + x] < prio) {
                     if (x < 0 || x > 255)
                         continue;
+                    if (blocked) {
+                        target[x] = 0xff000000;
+                        priority[y * WINDOW_WIDTH + x] = prio;
+                        continue;
+                    }
+
                     uint32_t col = r5g5b5_to_r8g8b8a8(
                         ppu.cgram[128 + ppu.oam[i].palette * 16 +
                                   tiles[x_off]]);
@@ -396,7 +474,7 @@ void try_step_ppu(void) {
                         }
                     }
 
-                    static uint8_t inc_mode_lut[8][5] = {
+                    static uint8_t transfer_patterns[8][5] = {
                         {1, 0, 0, 0, 0}, {2, 0, 1, 0, 0}, {2, 0, 0, 0, 0},
                         {4, 0, 0, 1, 1}, {4, 0, 1, 2, 3}, {4, 0, 1, 0, 1},
                         {2, 0, 0, 0, 0}, {4, 0, 0, 1, 1},
@@ -405,16 +483,25 @@ void try_step_ppu(void) {
                         if (cpu.memory.dmas[i].hdma_repeat ||
                             !cpu.memory.dmas[i].hdma_waiting) {
                             uint8_t count =
-                                inc_mode_lut[cpu.memory.dmas[i].addr_inc_mode]
-                                            [0];
+                                transfer_patterns[cpu.memory.dmas[i]
+                                                      .transfer_pattern][0];
                             uint32_t addr = cpu.memory.dmas[i].dma_byte_count;
                             for (uint8_t j = 0; j < count; j++) {
                                 uint8_t to_write =
                                     read_8(U24_LOSHORT(addr), U24_HIBYTE(addr));
-                                addr = TO_U24(U24_LOSHORT(addr) + 1,
-                                              U24_HIBYTE(addr));
-                                write_8(0x2100 + cpu.memory.dmas[i].b_bus_addr,
-                                        0, to_write);
+                                if (cpu.memory.dmas[i].addr_inc_mode == 0)
+                                    addr = TO_U24(U24_LOSHORT(addr) + 1,
+                                                  U24_HIBYTE(addr));
+                                if (cpu.memory.dmas[i].addr_inc_mode == 2)
+                                    addr = TO_U24(U24_LOSHORT(addr) - 1,
+                                                  U24_HIBYTE(addr));
+
+                                write_8(
+                                    0x2100 + cpu.memory.dmas[i].b_bus_addr +
+                                        transfer_patterns[cpu.memory.dmas[i]
+                                                              .transfer_pattern]
+                                                         [1 + j],
+                                    0, to_write);
                             }
                             cpu.memory.dmas[i].dma_byte_count = addr;
                             if (!cpu.memory.dmas[i].hdma_repeat)
@@ -424,17 +511,25 @@ void try_step_ppu(void) {
                         if (cpu.memory.dmas[i].hdma_repeat ||
                             !cpu.memory.dmas[i].hdma_waiting) {
                             uint8_t count =
-                                inc_mode_lut[cpu.memory.dmas[i].addr_inc_mode]
-                                            [0];
+                                transfer_patterns[cpu.memory.dmas[i]
+                                                      .transfer_pattern][0];
                             uint32_t addr =
                                 cpu.memory.dmas[i].hdma_current_address;
                             for (uint8_t j = 0; j < count; j++) {
                                 uint8_t to_write =
                                     read_8(U24_LOSHORT(addr), U24_HIBYTE(addr));
-                                addr = TO_U24(U24_LOSHORT(addr) + 1,
-                                              U24_HIBYTE(addr));
-                                write_8(0x2100 + cpu.memory.dmas[i].b_bus_addr,
-                                        0, to_write);
+                                if (cpu.memory.dmas[i].addr_inc_mode == 0)
+                                    addr = TO_U24(U24_LOSHORT(addr) + 1,
+                                                  U24_HIBYTE(addr));
+                                if (cpu.memory.dmas[i].addr_inc_mode == 2)
+                                    addr = TO_U24(U24_LOSHORT(addr) - 1,
+                                                  U24_HIBYTE(addr));
+                                write_8(
+                                    0x2100 + cpu.memory.dmas[i].b_bus_addr +
+                                        transfer_patterns[cpu.memory.dmas[i]
+                                                              .transfer_pattern]
+                                                         [1 + j],
+                                    0, to_write);
                             }
                             cpu.memory.dmas[i].hdma_current_address = addr;
                             if (!cpu.memory.dmas[i].hdma_repeat)
@@ -449,20 +544,15 @@ void try_step_ppu(void) {
 
         if (ppu.beam_x == 22 && ppu.beam_y > 0 && ppu.beam_y < 225) {
             for (uint16_t i = 0; i < 256; i++) {
-                framebuffer[(ppu.beam_y - 1) * WINDOW_WIDTH * 4 + i * 4 + 0] =
-                    0;
-                framebuffer[(ppu.beam_y - 1) * WINDOW_WIDTH * 4 + i * 4 + 1] =
-                    0;
-                framebuffer[(ppu.beam_y - 1) * WINDOW_WIDTH * 4 + i * 4 + 2] =
-                    0;
-                framebuffer[(ppu.beam_y - 1) * WINDOW_WIDTH * 4 + i * 4 + 3] =
-                    0;
+                ((uint32_t *)framebuffer)[(ppu.beam_y - 1) * WINDOW_WIDTH + i] =
+                    r5g5b5_to_r8g8b8a8(ppu.fixed_color);
                 priority[(ppu.beam_y - 1) * WINDOW_WIDTH + i] = 0;
             }
             if (ppu.bg_mode == 0) {
                 draw_bg(0, ppu.beam_y - 1, BPP_2, 7, 10);
                 draw_bg(1, ppu.beam_y - 1, BPP_2, 6, 9);
                 draw_bg(2, ppu.beam_y - 1, BPP_2, 1, 4);
+                draw_bg(3, ppu.beam_y - 1, BPP_2, 0, 3);
             }
             if (ppu.bg_mode == 1) {
                 draw_bg(0, ppu.beam_y - 1, BPP_4, 7, 10);
@@ -529,38 +619,33 @@ void ui(void) {
 
         if (cpu.memory.joy_auto_read) {
             cpu.memory.joy1l = 0;
+            cpu.memory.joy1l |= IsGamepadButtonDown(0, GAMEPAD_R) << 4;
+            cpu.memory.joy1l |= IsGamepadButtonDown(0, GAMEPAD_L) << 5;
+            cpu.memory.joy1l |= IsGamepadButtonDown(0, GAMEPAD_X) << 6;
+            cpu.memory.joy1l |= IsGamepadButtonDown(0, GAMEPAD_A) << 7;
+            cpu.memory.joy1l |= IsGamepadButtonDown(0, GAMEPAD_RIGHT) << 8;
+            cpu.memory.joy1l |= IsGamepadButtonDown(0, GAMEPAD_LEFT) << 9;
+            cpu.memory.joy1l |= IsGamepadButtonDown(0, GAMEPAD_DOWN) << 10;
+            cpu.memory.joy1l |= IsGamepadButtonDown(0, GAMEPAD_UP) << 11;
+            cpu.memory.joy1l |= IsGamepadButtonDown(0, GAMEPAD_START) << 12;
+            cpu.memory.joy1l |= IsGamepadButtonDown(0, GAMEPAD_SELECT) << 13;
+            cpu.memory.joy1l |= IsGamepadButtonDown(0, GAMEPAD_Y) << 14;
+            cpu.memory.joy1l |= IsGamepadButtonDown(0, GAMEPAD_B) << 15;
+
             cpu.memory.joy1l |=
-                IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_TRIGGER_1) << 4;
+                (GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_X) > 0.5) << 8;
             cpu.memory.joy1l |=
-                IsGamepadButtonDown(0, GAMEPAD_BUTTON_LEFT_TRIGGER_1) << 5;
+                (GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_X) < -0.5) << 9;
             cpu.memory.joy1l |=
-                IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_UP) << 6;
+                (GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_Y) > 0.5) << 10;
             cpu.memory.joy1l |=
-                IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT) << 7;
-            cpu.memory.joy1l |=
-                IsGamepadButtonDown(0, GAMEPAD_BUTTON_LEFT_FACE_RIGHT) << 8;
-            cpu.memory.joy1l |=
-                IsGamepadButtonDown(0, GAMEPAD_BUTTON_LEFT_FACE_LEFT) << 9;
-            cpu.memory.joy1l |=
-                IsGamepadButtonDown(0, GAMEPAD_BUTTON_LEFT_FACE_DOWN) << 10;
-            cpu.memory.joy1l |=
-                IsGamepadButtonDown(0, GAMEPAD_BUTTON_LEFT_FACE_UP) << 11;
-            cpu.memory.joy1l |=
-                IsGamepadButtonDown(0, GAMEPAD_BUTTON_MIDDLE_RIGHT) << 12;
-            cpu.memory.joy1l |=
-                IsGamepadButtonDown(0, GAMEPAD_BUTTON_MIDDLE_LEFT) << 13;
-            cpu.memory.joy1l |=
-                IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_DOWN) << 14;
-            cpu.memory.joy1l |=
-                IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_LEFT) << 15;
+                (GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_Y) < -0.5) << 11;
         }
 
         UpdateTexture(texture, framebuffer);
-        uint8_t brightness = 0xff * (ppu.brightness / 16.f);
         DrawTexturePro(texture, (Rectangle){0, 0, WINDOW_WIDTH, WINDOW_HEIGHT},
                        (Rectangle){0, 0, GetScreenWidth(), GetScreenHeight()},
-                       (Vector2){0, 0}, 0.0f,
-                       (Color){brightness, brightness, brightness, 0xff});
+                       (Vector2){0, 0}, 0.0f, WHITE);
 
         if (IsKeyPressed(KEY_TAB)) {
             view_debug_ui = !view_debug_ui;

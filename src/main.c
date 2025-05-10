@@ -64,7 +64,8 @@ static cart_hash_t rom_hash_lookup[] = {
     {"Super Mario World", 0x270efb15, LOROM},
     {"Super Mario All Stars", 0x2272b1cd, LOROM},
     {"SNES CPU Test", 0x69d6bf43, LOROM},
-    {"SNES CPU Test Basic", 0x7b3f6de6, LOROM}};
+    {"SNES CPU Test Basic", 0x7b3f6de6, LOROM},
+    {"Earthbound", 0xb4975b60, HIROM}};
 
 int main(int argc, char **argv) {
     ASSERT(argc == 2,
@@ -135,13 +136,14 @@ int main(int argc, char **argv) {
     cpu.memory.rom_size = pow(2, header[0x17]) * 1024;
     cpu.memory.sram = calloc(pow(2, header[0x18]) * 1024, 1);
     cpu.memory.sram_size = pow(2, header[0x18]) * 1024;
-    ASSERT(file_size == cpu.memory.rom_size,
-           "File size: %d, ROM size: %d, expected equal length", file_size,
-           cpu.memory.rom_size);
-    memcpy(cpu.memory.rom, file_to_hash, file_size);
+    // ASSERT(file_size == cpu.memory.rom_size,
+    //        "File size: %d, ROM size: %d, expected equal length", file_size,
+    //        cpu.memory.rom_size);
+    memcpy(cpu.memory.rom, file_to_hash, MIN(file_size, cpu.memory.rom_size));
     cpu.memory.mode = mode;
     cpu_reset();
     spc_reset();
+    cpu.state = STATE_RUNNING;
     ui();
 
     free(cpu.memory.sram);

@@ -141,10 +141,12 @@ void bg_window(void) {
     ImGui::Text("Y Scroll: %d", ppu.bg_config[bg_selected].v_scroll);
     ImGui::Text("Tile Size: %dpx",
                 ppu.bg_config[bg_selected].large_characters ? 16 : 8);
-    ImGui::Text("Window 1 %sabled",
-                ppu.bg_config[bg_selected].window_1_enable ? "en" : "dis");
-    ImGui::Text("Window 2 %sabled",
-                ppu.bg_config[bg_selected].window_2_enable ? "en" : "dis");
+    ImGui::Text("Window 1 %sabled%s",
+                ppu.bg_config[bg_selected].window_1_enable ? "en" : "dis",
+                ppu.bg_config[bg_selected].window_1_invert ? ", inverted" : "");
+    ImGui::Text("Window 2 %sabled%s",
+                ppu.bg_config[bg_selected].window_2_enable ? "en" : "dis",
+                ppu.bg_config[bg_selected].window_2_invert ? ", inverted" : "");
     ImGui::End();
 }
 

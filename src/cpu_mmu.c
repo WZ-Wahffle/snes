@@ -163,6 +163,86 @@ uint8_t mmu_read(uint16_t addr, uint8_t bank, bool log) {
                 return U16_LOBYTE(cpu.memory.joy2l);
             case 0x421b:
                 return U16_HIBYTE(cpu.memory.joy2l);
+            case 0x4300:
+            case 0x4310:
+            case 0x4320:
+            case 0x4330:
+            case 0x4340:
+            case 0x4350:
+            case 0x4360:
+            case 0x4370:
+                return (cpu.memory.dmas[(addr - 0x4300) / 16].direction << 7) |
+                       (cpu.memory.dmas[(addr - 0x4300) / 16].indirect_hdma
+                        << 6) |
+                       (cpu.memory.dmas[(addr - 0x4300) / 16].addr_inc_mode
+                        << 3) |
+                       cpu.memory.dmas[(addr - 0x4300) / 16].transfer_pattern;
+            case 0x4301:
+            case 0x4311:
+            case 0x4321:
+            case 0x4331:
+            case 0x4341:
+            case 0x4351:
+            case 0x4361:
+            case 0x4371:
+                return cpu.memory.dmas[(addr - 0x4300) / 16].b_bus_addr;
+            case 0x4302:
+            case 0x4312:
+            case 0x4322:
+            case 0x4332:
+            case 0x4342:
+            case 0x4352:
+            case 0x4362:
+            case 0x4372:
+                return cpu.memory.dmas[(addr - 0x4300) / 16].dma_src_addr >> 0;
+            case 0x4303:
+            case 0x4313:
+            case 0x4323:
+            case 0x4333:
+            case 0x4343:
+            case 0x4353:
+            case 0x4363:
+            case 0x4373:
+                return cpu.memory.dmas[(addr - 0x4300) / 16].dma_src_addr >> 8;
+            case 0x4304:
+            case 0x4314:
+            case 0x4324:
+            case 0x4334:
+            case 0x4344:
+            case 0x4354:
+            case 0x4364:
+            case 0x4374:
+                return cpu.memory.dmas[(addr - 0x4300) / 16].dma_src_addr >> 16;
+            case 0x4305:
+            case 0x4315:
+            case 0x4325:
+            case 0x4335:
+            case 0x4345:
+            case 0x4355:
+            case 0x4365:
+            case 0x4375:
+                return cpu.memory.dmas[(addr - 0x4300) / 16].dma_byte_count >>
+                       0;
+            case 0x4306:
+            case 0x4316:
+            case 0x4326:
+            case 0x4336:
+            case 0x4346:
+            case 0x4356:
+            case 0x4366:
+            case 0x4376:
+                return cpu.memory.dmas[(addr - 0x4300) / 16].dma_byte_count >>
+                       8;
+            case 0x4307:
+            case 0x4317:
+            case 0x4327:
+            case 0x4337:
+            case 0x4347:
+            case 0x4357:
+            case 0x4367:
+            case 0x4377:
+                return cpu.memory.dmas[(addr - 0x4300) / 16].dma_byte_count >>
+                       16;
             default:
                 UNREACHABLE_SWITCH(addr);
             }
@@ -179,7 +259,10 @@ static uint8_t transfer_patterns[8][4] = {
     {0, 1, 2, 3}, {0, 1, 0, 1}, {0, 0, 0, 0}, {0, 0, 1, 1}};
 
 void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
-    if ((bank < 0x40 || (bank >= 0x80 && bank < 0xc0)) && addr < 0x8000) {
+    if (bank >= 0x70 && bank <= 0x7d) {
+        cpu.memory.sram[addr % cpu.memory.sram_size] = value;
+    } else if ((bank < 0x40 || (bank >= 0x80 && bank < 0xc0)) &&
+               addr < 0x8000) {
         if (addr < 0x2000) {
             cpu.memory.ram[addr] = value;
         } else if (addr < 0x6000) {
@@ -480,6 +563,22 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                                 "CPU: wrote 0x%02x to port %d of APU bus",
                                 value, addr - 0x2140 + 1);
                 cpu.memory.apu_io[addr - 0x2140] = value;
+                break;
+            case 0x2180:
+                cpu.memory.ram[cpu.memory.ramaddr] = value;
+                cpu.memory.ramaddr &= 0x1ffff;
+                break;
+            case 0x2181:
+                cpu.memory.ramaddr &= ~0xff;
+                cpu.memory.ramaddr |= value;
+                break;
+            case 0x2182:
+                cpu.memory.ramaddr &= ~0xff00;
+                cpu.memory.ramaddr |= value << 8;
+                break;
+            case 0x2183:
+                cpu.memory.ramaddr &= 0xffff;
+                cpu.memory.ramaddr |= (value << 16) & 1;
                 break;
             case 0x4200:
                 cpu.memory.joy_auto_read = value & 1;

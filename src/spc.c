@@ -199,6 +199,9 @@ void spc_execute(void) {
         timer_timer -= 128;
     }
     switch (opcode) {
+    case 0x00:
+        // this page intentionally left blank
+        break;
     case 0x03:
         spc_bbs0(SM_DIR_PAGE_BIT_REL);
         break;

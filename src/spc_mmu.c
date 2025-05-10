@@ -87,12 +87,12 @@ void spc_mmu_write(uint16_t addr, uint8_t val, bool log) {
             spc.memory.timers[1].enable = val & 0x2;
             spc.memory.timers[0].enable = val & 0x1;
             if (val & 0x20) {
-                spc.memory.ram[0xf7] = 0;
-                spc.memory.ram[0xf6] = 0;
+                cpu.memory.apu_io[2] = 0;
+                cpu.memory.apu_io[3] = 0;
             }
             if (val & 0x10) {
-                spc.memory.ram[0xf5] = 0;
-                spc.memory.ram[0xf4] = 0;
+                cpu.memory.apu_io[0] = 0;
+                cpu.memory.apu_io[1] = 0;
             }
             break;
         case 0xf2:
@@ -101,6 +101,16 @@ void spc_mmu_write(uint16_t addr, uint8_t val, bool log) {
         case 0xf3: {
             if (spc.memory.dsp_addr % 16 >= 9) {
                 switch (spc.memory.dsp_addr) {
+                case 0x0f:
+                case 0x1f:
+                case 0x2f:
+                case 0x3f:
+                case 0x4f:
+                case 0x5f:
+                case 0x6f:
+                case 0x7f:
+                    spc.memory.coefficients[spc.memory.dsp_addr - 0x0f] = val;
+                    break;
                 case 0x0c:
                     spc.memory.vol_left = val;
                     break;

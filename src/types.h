@@ -151,6 +151,7 @@ typedef struct {
     uint8_t *sram;
     uint32_t sram_size;
     uint8_t ram[0x20000];
+    uint32_t ramaddr;
     memory_map_mode_t mode;
 
     struct dma_t {
