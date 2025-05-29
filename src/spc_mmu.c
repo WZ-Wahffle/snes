@@ -21,37 +21,76 @@ uint8_t spc_mmu_read(uint16_t addr, bool log) {
         case 0xf2:
             return spc.memory.dsp_addr;
         case 0xf3: {
-            switch (spc.memory.dsp_addr % 16) {
-            case 0:
+            switch (spc.memory.dsp_addr % 0x10) {
+            case 0x00:
                 return spc.memory.channels[spc.memory.dsp_addr / 16].vol_left;
-            case 1:
+            case 0x01:
                 return spc.memory.channels[spc.memory.dsp_addr / 16].vol_right;
-            case 2:
+            case 0x02:
                 return U16_LOBYTE(
                     spc.memory.channels[spc.memory.dsp_addr / 16].pitch);
-            case 3:
+            case 0x03:
                 return U16_HIBYTE(
                     spc.memory.channels[spc.memory.dsp_addr / 16].pitch);
-            case 4:
+            case 0x04:
                 return spc.memory.channels[spc.memory.dsp_addr / 16]
                     .sample_source_directory;
-            case 5:
+            case 0x05:
                 return (spc.memory.channels[spc.memory.dsp_addr / 16]
                             .adsr_enable
                         << 7) |
                        (spc.memory.channels[spc.memory.dsp_addr / 16].d_rate
                         << 4) |
                        (spc.memory.channels[spc.memory.dsp_addr / 16].a_rate);
-            case 6:
+            case 0x06:
                 return (spc.memory.channels[spc.memory.dsp_addr / 16].s_rate
                         << 5) |
                        (spc.memory.channels[spc.memory.dsp_addr / 16].r_rate);
-            case 7:
+            case 0x07:
                 return spc.memory.channels[spc.memory.dsp_addr / 16].gain;
-            case 8:
+            case 0x08:
                 return spc.memory.channels[spc.memory.dsp_addr / 16].envx;
-            case 9:
+            case 0x09:
                 return spc.memory.channels[spc.memory.dsp_addr / 16].outx;
+            case 0x0c: {
+                switch (spc.memory.dsp_addr) {
+                case 0x0c:
+                    return spc.memory.vol_left;
+                case 0x1c:
+                    return spc.memory.vol_right;
+                case 0x2c:
+                    return spc.memory.echo_left;
+                case 0x3c:
+                    return spc.memory.echo_right;
+                case 0x4c:
+                    return spc.memory.key_on;
+                case 0x5c:
+                    return spc.memory.key_off;
+                case 0x6c:
+                    return (spc.memory.mute_voices << 7) |
+                           (spc.memory.mute_all << 6) |
+                           (spc.memory.disable_echo_write << 5) |
+                           spc.memory.noise_freq;
+                case 0x7c:
+                    return spc.memory.endx;
+
+                default:
+                    UNREACHABLE_SWITCH(spc.memory.dsp_addr);
+                }
+
+                return 0;
+            }
+            case 0x0d:
+                switch (spc.memory.dsp_addr) {
+                case 0x0d:
+                    return spc.memory.echo_feedback;
+                case 0x7d:
+                    return spc.memory.echo_delay;
+                default:
+                    UNREACHABLE_SWITCH(spc.memory.dsp_addr);
+                }
+            case 0x0f:
+                return spc.memory.coefficients[spc.memory.dsp_addr / 16];
             default:
                 UNREACHABLE_SWITCH(spc.memory.dsp_addr % 16);
             }

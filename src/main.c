@@ -66,7 +66,16 @@ static cart_hash_t rom_hash_lookup[] = {
     {"SNES CPU Test", 0x69d6bf43, LOROM},
     {"SNES CPU Test Basic", 0x7b3f6de6, LOROM},
     {"SNES SPC Test", 0xb9a70b6a, LOROM},
-    {"Earthbound", 0xb4975b60, HIROM}};
+    {"Earthbound", 0xb4975b60, HIROM},
+    {"Puzzle Bobble", 0xc1a14c71, LOROM},
+    {"Super Mario RPG", 0x834c11c2, LOROM},
+    {"Super Mario Kart", 0x2202b32f, HIROM}};
+
+void at_exit(void) {
+    for (uint16_t i = cpu.history_idx; i != cpu.history_idx - 1; i++) {
+        printf("0x%06x: 0x%02x\n", cpu.pc_history[i], cpu.opcode_history[i]);
+    }
+}
 
 int main(int argc, char **argv) {
     ASSERT(argc == 2,
@@ -134,17 +143,19 @@ int main(int argc, char **argv) {
     log_message(LOG_LEVEL_INFO, "RAM size: %d kilobytes",
                 (uint32_t)pow(2, (double)(header[0x18])));
 
-    cpu.memory.rom = calloc(pow(2, header[0x17]) * 1024, 1);
+    cpu.memory.coprocessor = header[0x16] >> 8;
     cpu.memory.rom_size = pow(2, header[0x17]) * 1024;
-    cpu.memory.sram = calloc(pow(2, header[0x18]) * 1024, 1);
+    cpu.memory.rom = calloc(cpu.memory.rom_size, 1);
     cpu.memory.sram_size = pow(2, header[0x18]) * 1024;
-    // ASSERT(file_size == cpu.memory.rom_size,
-    //        "File size: %d, ROM size: %d, expected equal length", file_size,
-    //        cpu.memory.rom_size);
+    cpu.memory.sram = calloc(cpu.memory.sram_size, 1);
+    for (uint32_t i = 0; i < cpu.memory.sram_size; i++) {
+        cpu.memory.sram[i] = 0xff;
+    }
     memcpy(cpu.memory.rom, file_to_hash, MIN(file_size, cpu.memory.rom_size));
     cpu.memory.mode = mode;
     cpu_reset();
     spc_reset();
+    atexit(at_exit);
     ui();
 
     free(cpu.memory.sram);

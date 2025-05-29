@@ -48,7 +48,7 @@ void cpu_window(void) {
             confirm_load = true;
         }
     }
-    ImGui::Text("PC: 0x%04x Opcode: 0x%02x", cpu.pc,
+    ImGui::Text("PC: 0x%06x Opcode: 0x%02x", cpu.pc + (cpu.pbr << 16),
                 read_8_no_log(cpu.pc, cpu.pbr));
     if (ImGui::Button("Start"))
         cpu.state = STATE_RUNNING;
@@ -83,8 +83,12 @@ void cpu_window(void) {
     ImGui::Text("D: 0x%04x", cpu.d);
     ImGui::Text("SP: 0x%04x", cpu.s);
     ImGui::Text("P: 0x%02x", cpu.p);
-    ImGui::Text("Instruction Bank: 0x%02x", cpu.pbr);
     ImGui::Text("Data Bank: 0x%02x", cpu.dbr);
+    ImGui::Text("JOY1L: 0x%02x", cpu.memory.joy1l);
+    ImGui::Text("JOY1H: 0x%02x", cpu.memory.joy1h);
+    ImGui::Text("JOY2L: 0x%02x", cpu.memory.joy2l);
+    ImGui::Text("JOY2H: 0x%02x", cpu.memory.joy2h);
+    ImGui::Text("WRAM Address: 0x%06x", cpu.memory.ramaddr);
 
     ImGui::NewLine();
     if (ImGui::Button("+##cpubpadd")) {
@@ -152,12 +156,28 @@ void ppu_window(void) {
                 ppu.address_increment_amount);
     ImGui::Text("Window 1: %d-%d", ppu.window_1_l, ppu.window_1_r);
     ImGui::Text("Window 2: %d-%d", ppu.window_2_l, ppu.window_2_r);
+    ImGui::Text("Beam X: %d", ppu.beam_x);
+    ImGui::Text("Beam Y: %d", ppu.beam_y);
+    ImGui::Text("H Target: %d", ppu.h_timer_target);
+    ImGui::Text("V Target: %d", ppu.v_timer_target);
+    ImGui::Text("Target Mode: %d", cpu.timer_irq);
     ImGui::End();
 }
 
 int bg_selected = 0;
 void bg_window(void) {
     ImGui::Begin("bg", NULL, ImGuiWindowFlags_HorizontalScrollbar);
+
+    ImGui::Text("Disable:");
+    ImGui::Checkbox("BG1", &ppu.enable_bg_override[0]);
+    ImGui::SameLine();
+    ImGui::Checkbox("BG2", &ppu.enable_bg_override[1]);
+    ImGui::SameLine();
+    ImGui::Checkbox("BG3", &ppu.enable_bg_override[2]);
+    ImGui::SameLine();
+    ImGui::Checkbox("BG4", &ppu.enable_bg_override[3]);
+    ImGui::SameLine();
+    ImGui::Checkbox("OBJ", &ppu.enable_obj_override);
 
     ImGui::InputInt("BG Layer", &bg_selected, 1, 1,
                     ImGuiInputTextFlags_CharsDecimal);
@@ -404,6 +424,48 @@ void cpu_ram_window(void) {
     ImGui::End();
 }
 
+int cpu_sram_bank = 0;
+int cpu_sram_page = 0;
+void cpu_sram_window(void) {
+    ImGui::Begin("sram", NULL, ImGuiWindowFlags_HorizontalScrollbar);
+    ImGui::InputInt("Bank", &cpu_sram_bank, 0, 0,
+                    ImGuiInputTextFlags_CharsHexadecimal);
+    ImGui::SameLine();
+    ImGui::InputInt("Page", &cpu_sram_page, 0, 0,
+                    ImGuiInputTextFlags_CharsHexadecimal);
+    if (cpu_sram_page < 0)
+        cpu_sram_page = 0;
+    if (cpu_sram_page > 0xff) {
+        cpu_sram_page = 0;
+        cpu_sram_bank++;
+    }
+    if (cpu_sram_bank < 0)
+        cpu_sram_bank = 0;
+    if ((uint32_t)cpu_sram_bank > cpu.memory.sram_size / 0x10000 - 1)
+        cpu_sram_bank = cpu.memory.sram_size / 0x10000 - 1;
+    if (ImGui::BeginTable("##cpusram", 16,
+                          ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
+        for (uint16_t i = 0; i < 16; i++) {
+            for (uint8_t j = 0; j < 16; j++) {
+                ImGui::TableNextColumn();
+                ImGui::Text(
+                    "%02x",
+                    cpu.memory.sram[cpu_sram_bank * 0x10000 +
+                                    cpu_sram_page * 0x100 + i * 16 + j]);
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("0x%06x", cpu_sram_bank * 0x10000 +
+                                                    cpu_sram_page * 0x100 +
+                                                    i * 16 + j);
+                }
+            }
+            if (i != 15)
+                ImGui::TableNextRow();
+        }
+        ImGui::EndTable();
+    }
+    ImGui::End();
+}
+
 int cpu_rom_bank = 0;
 int cpu_rom_page = 0;
 void cpu_rom_window(void) {
@@ -429,12 +491,22 @@ void cpu_rom_window(void) {
         cpu_rom_bank = 0xff;
     if (ImGui::BeginTable("##cpurom", 16,
                           ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
-        if (cpu.memory.mode != LOROM)
-            TODO("other modes");
+        uint32_t (*resolver)(uint32_t, bool);
+        switch (cpu.memory.mode) {
+        case LOROM:
+            resolver = lo_rom_resolve;
+            break;
+        case HIROM:
+            resolver = hi_rom_resolve;
+            break;
+        case EXHIROM:
+            resolver = ex_hi_rom_resolve;
+            break;
+        }
         for (uint16_t i = 0; i < 16; i++) {
             for (uint8_t j = 0; j < 16; j++) {
                 ImGui::TableNextColumn();
-                ImGui::Text("%02x", cpu.memory.rom[lo_rom_resolve(
+                ImGui::Text("%02x", cpu.memory.rom[resolver(
                                         cpu_rom_bank * 0x10000 +
                                             cpu_rom_page * 0x100 + i * 16 + j,
                                         false)]);
@@ -497,6 +569,7 @@ void cpp_imgui_render(void) {
     bg_window();
     oam_window();
     cpu_ram_window();
+    cpu_sram_window();
     cpu_rom_window();
     cpu_window();
     dsp_window();

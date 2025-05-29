@@ -72,8 +72,7 @@ void try_step_cpu(void) {
             set_status_bit(STATUS_BCD, false);
             cpu.pc = read_16(cpu.emulation_mode ? 0xfff4 : 0xffe4, 0);
             cpu.pbr = 0;
-        } else if (!get_status_bit(STATUS_IRQOFF) && cpu.irq &&
-                   !(cpu.emulation_mode && cpu.pbr != 0)) {
+        } else if (!get_status_bit(STATUS_IRQOFF) && cpu.irq) {
             if (!cpu.emulation_mode)
                 push_8(cpu.pbr);
             push_16(cpu.pc);
@@ -92,7 +91,7 @@ void try_step_spc(void) {
         if (spc.breakpoint_valid && spc.pc == spc.breakpoint) {
             cpu.state = STATE_STOPPED;
         }
-        if(spc.brk) {
+        if (spc.brk) {
             spc.brk = false;
             spc_push_16(spc.pc);
             spc_push_8(spc.p);
@@ -197,9 +196,85 @@ void fetch_tile_color_row(uint16_t tile_vram_offset, uint8_t y_offset,
             adj_tile_vram_offset += 32;
         }
     } break;
-    case BPP_8:
-        TODO("8bpp");
-        break;
+    case BPP_8: {
+        uint16_t adj_tile_vram_offset =
+            tile_vram_offset + (y_offset % 8) * 2 + (y_offset / 8) * 1024;
+        for (uint8_t i = 0; i < width / 8; i++) {
+            out[i * 8 + 0] =
+                (((ppu.vram[adj_tile_vram_offset + 0] >> 7) & 1) << 0) |
+                (((ppu.vram[adj_tile_vram_offset + 1] >> 7) & 1) << 1) |
+                (((ppu.vram[adj_tile_vram_offset + 16] >> 7) & 1) << 2) |
+                (((ppu.vram[adj_tile_vram_offset + 17] >> 7) & 1) << 3) |
+                (((ppu.vram[adj_tile_vram_offset + 32] >> 7) & 1) << 4) |
+                (((ppu.vram[adj_tile_vram_offset + 33] >> 7) & 1) << 5) |
+                (((ppu.vram[adj_tile_vram_offset + 48] >> 7) & 1) << 6) |
+                (((ppu.vram[adj_tile_vram_offset + 49] >> 7) & 1) << 7);
+            out[i * 8 + 1] =
+                (((ppu.vram[adj_tile_vram_offset + 0] >> 6) & 1) << 0) |
+                (((ppu.vram[adj_tile_vram_offset + 1] >> 6) & 1) << 1) |
+                (((ppu.vram[adj_tile_vram_offset + 16] >> 6) & 1) << 2) |
+                (((ppu.vram[adj_tile_vram_offset + 17] >> 6) & 1) << 3) |
+                (((ppu.vram[adj_tile_vram_offset + 32] >> 6) & 1) << 4) |
+                (((ppu.vram[adj_tile_vram_offset + 33] >> 6) & 1) << 5) |
+                (((ppu.vram[adj_tile_vram_offset + 48] >> 6) & 1) << 6) |
+                (((ppu.vram[adj_tile_vram_offset + 49] >> 6) & 1) << 7);
+            out[i * 8 + 2] =
+                (((ppu.vram[adj_tile_vram_offset + 0] >> 5) & 1) << 0) |
+                (((ppu.vram[adj_tile_vram_offset + 1] >> 5) & 1) << 1) |
+                (((ppu.vram[adj_tile_vram_offset + 16] >> 5) & 1) << 2) |
+                (((ppu.vram[adj_tile_vram_offset + 17] >> 5) & 1) << 3) |
+                (((ppu.vram[adj_tile_vram_offset + 32] >> 5) & 1) << 4) |
+                (((ppu.vram[adj_tile_vram_offset + 33] >> 5) & 1) << 5) |
+                (((ppu.vram[adj_tile_vram_offset + 48] >> 5) & 1) << 6) |
+                (((ppu.vram[adj_tile_vram_offset + 49] >> 5) & 1) << 7);
+            out[i * 8 + 3] =
+                (((ppu.vram[adj_tile_vram_offset + 0] >> 4) & 1) << 0) |
+                (((ppu.vram[adj_tile_vram_offset + 1] >> 4) & 1) << 1) |
+                (((ppu.vram[adj_tile_vram_offset + 16] >> 4) & 1) << 2) |
+                (((ppu.vram[adj_tile_vram_offset + 17] >> 4) & 1) << 3) |
+                (((ppu.vram[adj_tile_vram_offset + 32] >> 4) & 1) << 4) |
+                (((ppu.vram[adj_tile_vram_offset + 33] >> 4) & 1) << 5) |
+                (((ppu.vram[adj_tile_vram_offset + 48] >> 4) & 1) << 6) |
+                (((ppu.vram[adj_tile_vram_offset + 49] >> 4) & 1) << 7);
+            out[i * 8 + 4] =
+                (((ppu.vram[adj_tile_vram_offset + 0] >> 3) & 1) << 0) |
+                (((ppu.vram[adj_tile_vram_offset + 1] >> 3) & 1) << 1) |
+                (((ppu.vram[adj_tile_vram_offset + 16] >> 3) & 1) << 2) |
+                (((ppu.vram[adj_tile_vram_offset + 17] >> 3) & 1) << 3) |
+                (((ppu.vram[adj_tile_vram_offset + 32] >> 3) & 1) << 4) |
+                (((ppu.vram[adj_tile_vram_offset + 33] >> 3) & 1) << 5) |
+                (((ppu.vram[adj_tile_vram_offset + 48] >> 3) & 1) << 6) |
+                (((ppu.vram[adj_tile_vram_offset + 49] >> 3) & 1) << 7);
+            out[i * 8 + 5] =
+                (((ppu.vram[adj_tile_vram_offset + 0] >> 2) & 1) << 0) |
+                (((ppu.vram[adj_tile_vram_offset + 1] >> 2) & 1) << 1) |
+                (((ppu.vram[adj_tile_vram_offset + 16] >> 2) & 1) << 2) |
+                (((ppu.vram[adj_tile_vram_offset + 17] >> 2) & 1) << 3) |
+                (((ppu.vram[adj_tile_vram_offset + 32] >> 2) & 1) << 4) |
+                (((ppu.vram[adj_tile_vram_offset + 33] >> 2) & 1) << 5) |
+                (((ppu.vram[adj_tile_vram_offset + 48] >> 2) & 1) << 6) |
+                (((ppu.vram[adj_tile_vram_offset + 49] >> 2) & 1) << 7);
+            out[i * 8 + 6] =
+                (((ppu.vram[adj_tile_vram_offset + 0] >> 1) & 1) << 0) |
+                (((ppu.vram[adj_tile_vram_offset + 1] >> 1) & 1) << 1) |
+                (((ppu.vram[adj_tile_vram_offset + 16] >> 1) & 1) << 2) |
+                (((ppu.vram[adj_tile_vram_offset + 17] >> 1) & 1) << 3) |
+                (((ppu.vram[adj_tile_vram_offset + 32] >> 1) & 1) << 4) |
+                (((ppu.vram[adj_tile_vram_offset + 33] >> 1) & 1) << 5) |
+                (((ppu.vram[adj_tile_vram_offset + 48] >> 1) & 1) << 6) |
+                (((ppu.vram[adj_tile_vram_offset + 49] >> 1) & 1) << 7);
+            out[i * 8 + 7] =
+                (((ppu.vram[adj_tile_vram_offset + 0] >> 0) & 1) << 0) |
+                (((ppu.vram[adj_tile_vram_offset + 1] >> 0) & 1) << 1) |
+                (((ppu.vram[adj_tile_vram_offset + 16] >> 0) & 1) << 2) |
+                (((ppu.vram[adj_tile_vram_offset + 17] >> 0) & 1) << 3) |
+                (((ppu.vram[adj_tile_vram_offset + 32] >> 0) & 1) << 4) |
+                (((ppu.vram[adj_tile_vram_offset + 33] >> 0) & 1) << 5) |
+                (((ppu.vram[adj_tile_vram_offset + 48] >> 0) & 1) << 6) |
+                (((ppu.vram[adj_tile_vram_offset + 49] >> 0) & 1) << 7);
+            adj_tile_vram_offset += 64;
+        }
+    } break;
     default:
         UNREACHABLE_SWITCH(bpp);
     }
@@ -210,6 +285,8 @@ void draw_bg(uint8_t bg_idx, uint16_t y, color_depth_t bpp, uint8_t low_prio,
     if (!ppu.bg_config[bg_idx].main_screen_enable &&
         !ppu.bg_config[bg_idx].sub_screen_enable)
         return;
+    if (ppu.enable_bg_override[bg_idx])
+        return;
     uint16_t screen_y = y;
     if (ppu.bg_config[bg_idx].enable_mosaic) {
         y -= y % (ppu.mosaic_size + 1);
@@ -217,10 +294,11 @@ void draw_bg(uint8_t bg_idx, uint16_t y, color_depth_t bpp, uint8_t low_prio,
     uint32_t *target =
         (uint32_t *)(framebuffer + (WINDOW_WIDTH * 4 * screen_y));
     uint8_t tilemap_w = ppu.bg_config[bg_idx].double_h_tilemap ? 64 : 32;
+    uint8_t tilemap_h = ppu.bg_config[bg_idx].double_v_tilemap ? 64 : 32;
     uint16_t tilemap_line_pointer = ppu.bg_config[bg_idx].tilemap_addr;
     uint8_t tile_size = ppu.bg_config[bg_idx].large_characters ? 16 : 8;
     uint8_t tile_index_v = ((y + ppu.bg_config[bg_idx].v_scroll) / tile_size);
-    if (tile_index_v > 31 && tilemap_w == 64) {
+    if (tile_index_v > 31 && tilemap_w == 64 && tilemap_h == 64) {
         tilemap_line_pointer += 0x1000;
     }
     tilemap_line_pointer += (tile_index_v % 32) * 2 * 32;
@@ -323,13 +401,13 @@ void draw_bg(uint8_t bg_idx, uint16_t y, color_depth_t bpp, uint8_t low_prio,
     }
 }
 
-// TODO: analyze path of data decompressed to 0x7e2000-0x7e43ff
-
 void draw_obj(uint16_t y) {
     static uint8_t size_lut[8][4] = {
         {8, 8, 16, 16},   {8, 8, 32, 32},   {8, 8, 64, 64},   {16, 16, 32, 32},
         {16, 16, 64, 64}, {32, 32, 64, 64}, {16, 32, 32, 64}, {16, 32, 32, 32}};
     uint8_t draw_count = 0;
+    if (ppu.enable_obj_override)
+        return;
 
     // step 1: collecting (lower index, higher priority)
     for (uint8_t i = 0; i < 128; i++) {
@@ -452,6 +530,7 @@ void try_step_ppu(void) {
                 (cpu.timer_irq == 3 && ppu.beam_y == ppu.v_timer_target &&
                  ppu.beam_x == ppu.h_timer_target)) {
                 cpu.irq = true;
+                cpu.memory.timer_has_occurred = true;
             }
         }
 
@@ -572,6 +651,10 @@ void try_step_ppu(void) {
                 draw_bg(2, ppu.beam_y - 1, BPP_2, 1,
                         ppu.mode_1_bg3_prio ? 12 : 4);
             }
+            if (ppu.bg_mode == 3) {
+                draw_bg(0, ppu.beam_y - 1, BPP_8, 4, 10);
+                draw_bg(1, ppu.beam_y - 1, BPP_4, 1, 7);
+            }
             draw_obj(ppu.beam_y - 1);
         }
     }
@@ -640,30 +723,30 @@ void ui(void) {
             }
         }
 
-        if (cpu.memory.joy_auto_read) {
-            cpu.memory.joy1l = 0;
-            cpu.memory.joy1l |= IsGamepadButtonDown(0, GAMEPAD_R) << 4;
-            cpu.memory.joy1l |= IsGamepadButtonDown(0, GAMEPAD_L) << 5;
-            cpu.memory.joy1l |= IsGamepadButtonDown(0, GAMEPAD_X) << 6;
-            cpu.memory.joy1l |= IsGamepadButtonDown(0, GAMEPAD_A) << 7;
-            cpu.memory.joy1l |= IsGamepadButtonDown(0, GAMEPAD_RIGHT) << 8;
-            cpu.memory.joy1l |= IsGamepadButtonDown(0, GAMEPAD_LEFT) << 9;
-            cpu.memory.joy1l |= IsGamepadButtonDown(0, GAMEPAD_DOWN) << 10;
-            cpu.memory.joy1l |= IsGamepadButtonDown(0, GAMEPAD_UP) << 11;
-            cpu.memory.joy1l |= IsGamepadButtonDown(0, GAMEPAD_START) << 12;
-            cpu.memory.joy1l |= IsGamepadButtonDown(0, GAMEPAD_SELECT) << 13;
-            cpu.memory.joy1l |= IsGamepadButtonDown(0, GAMEPAD_Y) << 14;
-            cpu.memory.joy1l |= IsGamepadButtonDown(0, GAMEPAD_B) << 15;
+        // if (cpu.memory.joy_auto_read) {
+        cpu.memory.joy1l = 0;
+        cpu.memory.joy1l |= IsGamepadButtonDown(0, GAMEPAD_R) << 4;
+        cpu.memory.joy1l |= IsGamepadButtonDown(0, GAMEPAD_L) << 5;
+        cpu.memory.joy1l |= IsGamepadButtonDown(0, GAMEPAD_X) << 6;
+        cpu.memory.joy1l |= IsGamepadButtonDown(0, GAMEPAD_A) << 7;
+        cpu.memory.joy1l |= IsGamepadButtonDown(0, GAMEPAD_RIGHT) << 8;
+        cpu.memory.joy1l |= IsGamepadButtonDown(0, GAMEPAD_LEFT) << 9;
+        cpu.memory.joy1l |= IsGamepadButtonDown(0, GAMEPAD_DOWN) << 10;
+        cpu.memory.joy1l |= IsGamepadButtonDown(0, GAMEPAD_UP) << 11;
+        cpu.memory.joy1l |= IsGamepadButtonDown(0, GAMEPAD_START) << 12;
+        cpu.memory.joy1l |= IsGamepadButtonDown(0, GAMEPAD_SELECT) << 13;
+        cpu.memory.joy1l |= IsGamepadButtonDown(0, GAMEPAD_Y) << 14;
+        cpu.memory.joy1l |= IsGamepadButtonDown(0, GAMEPAD_B) << 15;
 
-            cpu.memory.joy1l |=
-                (GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_X) > 0.5) << 8;
-            cpu.memory.joy1l |=
-                (GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_X) < -0.5) << 9;
-            cpu.memory.joy1l |=
-                (GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_Y) > 0.5) << 10;
-            cpu.memory.joy1l |=
-                (GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_Y) < -0.5) << 11;
-        }
+        cpu.memory.joy1l |=
+            (GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_X) > 0.5) << 8;
+        cpu.memory.joy1l |=
+            (GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_X) < -0.5) << 9;
+        cpu.memory.joy1l |=
+            (GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_Y) > 0.5) << 10;
+        cpu.memory.joy1l |=
+            (GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_Y) < -0.5) << 11;
+        // }
 
         UpdateTexture(texture, framebuffer);
         DrawTexturePro(texture, (Rectangle){0, 0, WINDOW_WIDTH, WINDOW_HEIGHT},

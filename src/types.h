@@ -126,7 +126,12 @@ typedef enum {
     STATUS_DIRECTPAGE = 5,
 } status_bit_t;
 
-typedef enum { STATE_STOPPED, STATE_CPU_STEPPED, STATE_SPC_STEPPED, STATE_RUNNING } emu_state_t;
+typedef enum {
+    STATE_STOPPED,
+    STATE_CPU_STEPPED,
+    STATE_SPC_STEPPED,
+    STATE_RUNNING
+} emu_state_t;
 
 typedef enum { R_C, R_X, R_Y, R_S, R_D } r_t;
 
@@ -153,6 +158,15 @@ typedef struct {
     uint8_t ram[0x20000];
     uint32_t ramaddr;
     memory_map_mode_t mode;
+    uint8_t coprocessor;
+
+    struct dsp1_t {
+        bool command_happened;
+        uint8_t command;
+        uint8_t read_bytes_r, written_bytes_r, read_bytes, written_bytes;
+        uint8_t operands[14];
+        uint8_t outputs[6];
+    } dsp1;
 
     struct dma_t {
         bool hdma_enable;
@@ -262,6 +276,9 @@ typedef struct {
 } spc_t;
 
 typedef struct {
+    bool enable_bg_override[4];
+    bool enable_obj_override;
+
     bool force_blanking;
     uint8_t brightness;
     uint8_t address_increment_amount, address_remapping;
@@ -353,6 +370,8 @@ typedef struct {
 #define EXTERNC
 #endif
 EXTERNC uint32_t lo_rom_resolve(uint32_t addr, bool log);
+EXTERNC uint32_t hi_rom_resolve(uint32_t addr, bool log);
+EXTERNC uint32_t ex_hi_rom_resolve(uint32_t addr, bool log);
 EXTERNC void set_status_bit(status_bit_t bit, bool value);
 EXTERNC bool get_status_bit(status_bit_t bit);
 EXTERNC void spc_set_status_bit(status_bit_t bit, bool value);
@@ -392,6 +411,8 @@ EXTERNC void spc_push_8(uint8_t val);
 EXTERNC void spc_push_16(uint16_t val);
 EXTERNC uint8_t spc_pop_8(void);
 EXTERNC uint16_t spc_pop_16(void);
+
+void dsp1_write(uint8_t);
 
 static void log_message(log_level_t level, char *message, ...) {
 #ifdef LOG_LEVEL

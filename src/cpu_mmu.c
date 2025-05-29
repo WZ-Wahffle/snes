@@ -46,6 +46,7 @@ uint32_t ex_hi_rom_resolve(uint32_t addr, bool log) {
 uint8_t mmu_read(uint16_t addr, uint8_t bank, bool log) {
     // ROM resolution
     uint8_t ret;
+
     switch (cpu.memory.mode) {
     case LOROM:
         if ((bank <= 0x7d || bank >= 0x80) && addr >= 0x8000) {
@@ -96,7 +97,7 @@ uint8_t mmu_read(uint16_t addr, uint8_t bank, bool log) {
             case 0x2136:
                 return (ppu.mul_factor_1 * ppu.mul_factor_2) >> 16;
             case 0x213f:
-                return 0;
+                return 3;
             case 0x2140:
             case 0x2141:
             case 0x2142:
@@ -108,7 +109,7 @@ uint8_t mmu_read(uint16_t addr, uint8_t bank, bool log) {
                     (((cpu.memory.joy1h >> cpu.memory.joy1_shift_idx) & 1)
                      << 1);
                 cpu.memory.joy1_shift_idx++;
-                cpu.memory.joy1_shift_idx %= 8;
+                cpu.memory.joy1_shift_idx %= 16;
                 return ret;
             }
             case 0x4017: {
@@ -133,7 +134,9 @@ uint8_t mmu_read(uint16_t addr, uint8_t bank, bool log) {
             case 0x4212: {
                 bool vblank = ppu.beam_y > 224;
                 bool hblank = ppu.beam_x > 278;
-                return (vblank << 7) | (hblank << 6);
+                bool read_in_progress =
+                    cpu.memory.joy_auto_read && ppu.beam_y == 224;
+                return (vblank << 7) | (hblank << 6) | read_in_progress;
             }
             case 0x4214:
                 if (cpu.memory.divisor == 0)
@@ -250,7 +253,10 @@ uint8_t mmu_read(uint16_t addr, uint8_t bank, bool log) {
                 return cpu.memory.dmas[(addr - 0x4300) / 16].dma_byte_count >>
                        16;
             default:
-                UNREACHABLE_SWITCH(addr);
+                log_message(LOG_LEVEL_WARNING,
+                            "Tried to read from bank 0x%02x, address 0x%04x",
+                            bank, addr);
+                return 0;
             }
         }
     } else if (bank == 0x7e || bank == 0x7f) {
@@ -599,20 +605,23 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                 cpu.memory.apu_io[addr - 0x2140] = value;
                 break;
             case 0x2180:
-                cpu.memory.ram[cpu.memory.ramaddr] = value;
+                cpu.memory.ram[cpu.memory.ramaddr++] = value;
                 cpu.memory.ramaddr &= 0x1ffff;
                 break;
             case 0x2181:
-                cpu.memory.ramaddr &= ~0xff;
+                cpu.memory.ramaddr &= 0x1ff00;
                 cpu.memory.ramaddr |= value;
                 break;
             case 0x2182:
-                cpu.memory.ramaddr &= ~0xff00;
+                cpu.memory.ramaddr &= 0x100ff;
                 cpu.memory.ramaddr |= value << 8;
                 break;
             case 0x2183:
                 cpu.memory.ramaddr &= 0xffff;
-                cpu.memory.ramaddr |= (value << 16) & 1;
+                cpu.memory.ramaddr |= (value & 1) << 16;
+                break;
+            case 0x4016:
+                cpu.memory.joy1_shift_idx = 0;
                 break;
             case 0x4200:
                 cpu.memory.joy_auto_read = value & 1;
@@ -811,7 +820,11 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                                                                         << 16;
                 break;
             default:
-                UNREACHABLE_SWITCH(addr);
+                log_message(
+                    LOG_LEVEL_WARNING,
+                    "Tried to write 0x%02x to bank 0x%02x, address 0x%04x",
+                    value, bank, addr);
+                return;
             }
         } else {
             TODO("expansion write");
