@@ -76,7 +76,7 @@ uint8_t spc_resolve_read(spc_addressing_mode_t mode) {
     case SM_INDX:
         return spc_read_8(spc_read_16((spc_next_8() + spc.x) % 0x100));
     case SM_INDY:
-        return spc_read_8((spc_read_16(spc_next_8()) + spc.y) % 0x100);
+        return spc_read_8((spc_read_16(spc_next_8()) + spc.y));
     case SM_INDIRECT:
         return spc_read_8(spc.x);
     case SM_INDIRECT_INC:
