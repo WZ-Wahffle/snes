@@ -56,6 +56,7 @@ static void log_message(log_level_t level, char *message, ...);
 #define WINDOW_HEIGHT 224
 #define CLOCK_FREQ 21477268
 #define CYCLES_PER_DOT 4
+#define SAMPLE_RATE 30000.f
 
 typedef enum { LOROM, HIROM, EXHIROM } memory_map_mode_t;
 
@@ -229,11 +230,25 @@ typedef struct {
     uint16_t pitch;
     uint8_t sample_source_directory;
     bool adsr_enable;
-    uint8_t a_rate, d_rate, s_rate, r_rate;
+    uint8_t a_rate, d_rate, s_level, s_rate;
     uint8_t gain;
+    uint16_t t;
+    bool key_on, key_off, playing;
 
     uint8_t envx;
     int8_t outx;
+
+    uint8_t remaining_samples;
+    int16_t sample_buffer[12];
+    bool loop, end;
+    uint8_t left_shift;
+    uint8_t filter;
+    uint16_t sample_addr;
+    uint16_t loop_addr;
+
+    bool should_end;
+
+    int16_t output;
 } dsp_channel_t;
 
 typedef struct {
@@ -244,6 +259,7 @@ typedef struct {
         uint8_t counter;
         uint8_t timer_internal;
     } timers[3];
+    AudioStream stream;
     dsp_channel_t channels[8];
     uint8_t coefficients[8];
     int8_t vol_left, vol_right, echo_left, echo_right;

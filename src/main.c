@@ -1,3 +1,4 @@
+#include "apu.h"
 #include "cpu.h"
 #include "ppu.h"
 #include "spc.h"
@@ -156,7 +157,9 @@ int main(int argc, char **argv) {
     cpu_reset();
     spc_reset();
     atexit(at_exit);
+    apu_init();
     ui();
+    apu_free();
 
     free(cpu.memory.sram);
     free(cpu.memory.rom);

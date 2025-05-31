@@ -43,9 +43,9 @@ uint8_t spc_mmu_read(uint16_t addr, bool log) {
                         << 4) |
                        (spc.memory.channels[spc.memory.dsp_addr / 16].a_rate);
             case 0x06:
-                return (spc.memory.channels[spc.memory.dsp_addr / 16].s_rate
+                return (spc.memory.channels[spc.memory.dsp_addr / 16].s_level
                         << 5) |
-                       (spc.memory.channels[spc.memory.dsp_addr / 16].r_rate);
+                       (spc.memory.channels[spc.memory.dsp_addr / 16].s_rate);
             case 0x07:
                 return spc.memory.channels[spc.memory.dsp_addr / 16].gain;
             case 0x08:
@@ -148,7 +148,7 @@ void spc_mmu_write(uint16_t addr, uint8_t val, bool log) {
                 case 0x5f:
                 case 0x6f:
                 case 0x7f:
-                    spc.memory.coefficients[spc.memory.dsp_addr - 0x0f] = val;
+                    spc.memory.coefficients[spc.memory.dsp_addr / 16] = val;
                     break;
                 case 0x0c:
                     spc.memory.vol_left = val;
@@ -164,9 +164,15 @@ void spc_mmu_write(uint16_t addr, uint8_t val, bool log) {
                     break;
                 case 0x4c:
                     spc.memory.key_on = val;
+                    for (uint8_t i = 0; i < 8; i++) {
+                        spc.memory.channels[i].key_on = val & (1 << i);
+                    }
                     break;
                 case 0x5c:
                     spc.memory.key_off = val;
+                    for (uint8_t i = 0; i < 8; i++) {
+                        spc.memory.channels[i].key_off = val & (1 << i);
+                    }
                     break;
                 case 0x6c:
                     spc.memory.mute_voices = val & 0x80;
@@ -234,9 +240,9 @@ void spc_mmu_write(uint16_t addr, uint8_t val, bool log) {
                         (val >> 4) & 0b111;
                     break;
                 case 6:
-                    spc.memory.channels[spc.memory.dsp_addr / 16].s_rate =
+                    spc.memory.channels[spc.memory.dsp_addr / 16].s_level =
                         val >> 5;
-                    spc.memory.channels[spc.memory.dsp_addr / 16].r_rate =
+                    spc.memory.channels[spc.memory.dsp_addr / 16].s_rate =
                         val & 0x1f;
                     break;
                 case 7:

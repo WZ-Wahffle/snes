@@ -527,6 +527,7 @@ void cpu_rom_window(void) {
 int dsp_selected = 0;
 void dsp_window(void) {
     ImGui::Begin("dsp", NULL, ImGuiWindowFlags_HorizontalScrollbar);
+    ImGui::Text("Sample Directory Page: 0x%04x", spc.memory.sample_source_directory_page << 8);
     ImGui::InputInt("Channel", &dsp_selected, 1, 1,
                     ImGuiInputTextFlags_CharsDecimal);
     if (dsp_selected > 7)
@@ -542,10 +543,10 @@ void dsp_window(void) {
     ImGui::Text("ADSR %sabled",
                 spc.memory.channels[dsp_selected].adsr_enable ? "en" : "dis");
     if (spc.memory.channels[dsp_selected].adsr_enable) {
-        ImGui::Text("A: %d", spc.memory.channels[dsp_selected].a_rate);
-        ImGui::Text("D: %d", spc.memory.channels[dsp_selected].d_rate);
-        ImGui::Text("S: %d", spc.memory.channels[dsp_selected].s_rate);
-        ImGui::Text("R: %d", spc.memory.channels[dsp_selected].r_rate);
+        ImGui::Text(" A: %d", spc.memory.channels[dsp_selected].a_rate);
+        ImGui::Text(" D: %d", spc.memory.channels[dsp_selected].d_rate);
+        ImGui::Text("SL: %d", spc.memory.channels[dsp_selected].s_level);
+        ImGui::Text("SR: %d", spc.memory.channels[dsp_selected].s_rate);
     }
     ImGui::End();
 }

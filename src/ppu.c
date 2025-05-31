@@ -661,7 +661,6 @@ void try_step_ppu(void) {
 }
 
 void ui(void) {
-    SetTraceLogLevel(LOG_ERROR);
     SetTargetFPS(60);
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(WINDOW_WIDTH * 4, WINDOW_HEIGHT * 4, "snes");
