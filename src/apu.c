@@ -2,23 +2,51 @@
 #include "raylib.h"
 #include "types.h"
 
+extern cpu_t cpu;
 extern spc_t spc;
 
-static void extract_sample(uint8_t brr, uint8_t shift, int16_t *out1,
+static void extract_sample(uint8_t brr, dsp_channel_t* chan, int16_t *out1,
                            int16_t *out2) {
     *out1 = (brr >> 4);
-    if(*out1 > 7) *out1 -= 16;
-    if (shift == 0)
-        *out1 >>= 1;
-    else
-        *out1 <<= shift - 1;
+    if (*out1 > 7)
+        *out1 -= 16;
+    if (chan->left_shift != 0)
+        *out1 <<= chan->left_shift;
+    *out1 >>= 1;
 
     *out2 = (brr & 0xf);
-    if(*out2 > 7) *out2 -= 16;
-    if (shift == 0)
-        *out2 >>= 1;
-    else
-        *out2 <<= shift - 1;
+    if (*out2 > 7)
+        *out2 -= 16;
+    if (chan->left_shift != 0)
+        *out2 <<= chan->left_shift;
+    *out2 >>= 1;
+
+    switch (chan->filter) {
+    case 0:
+        // this page intentionally left blank
+        break;
+    case 1:
+        *out1 += chan->prev_sample * 0.9375f;
+        *out2 += *out1 * 0.9375f;
+        break;
+    case 2:
+        *out1 += chan->prev_sample * 1.90625f;
+        *out1 -= chan->prev_prev_sample * 0.9375f;
+        *out2 += *out1 * 1.90625f;
+        *out2 -= chan->prev_sample * 0.9375f;
+        break;
+    case 3:
+        *out1 += chan->prev_sample * 1.796875f;
+        *out1 -= chan->prev_prev_sample * 0.8125f;
+        *out2 += *out1 * 1.796875f;
+        *out2 -= chan->prev_sample * 0.8125f;
+        break;
+    default:
+        UNREACHABLE_SWITCH(chan->filter);
+    }
+
+    chan->prev_prev_sample = *out1;
+    chan->prev_sample = *out2;
 }
 
 void audio_cb(void *buffer, unsigned int count) {
@@ -96,7 +124,7 @@ void audio_cb(void *buffer, unsigned int count) {
                 chan->end = spc.memory.ram[chan->sample_addr++] & 0b1;
                 for (uint8_t i = 0; i < 6; i++) {
                     extract_sample(spc.memory.ram[chan->sample_addr++],
-                                   chan->left_shift,
+                                   chan,
                                    &chan->sample_buffer[i * 2],
                                    &chan->sample_buffer[i * 2 + 1]);
                 }
@@ -120,6 +148,7 @@ void audio_cb(void *buffer, unsigned int count) {
                 result +=
                     gauss_lut[table_idx] * chan->sample_buffer[(idx + 3) % 12];
                 result >>= 11;
+
                 chan->output = result;
             }
             // checking if 4 sample points have been passed
@@ -130,7 +159,7 @@ void audio_cb(void *buffer, unsigned int count) {
                     to += 12;
                 for (uint8_t i = 0; i < 2; i++) {
                     extract_sample(spc.memory.ram[chan->sample_addr++],
-                                   chan->left_shift,
+                                   chan,
                                    &chan->sample_buffer[to + i * 2],
                                    &chan->sample_buffer[to + i * 2 + 1]);
                 }

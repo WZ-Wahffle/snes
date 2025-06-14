@@ -240,6 +240,8 @@ typedef struct {
 
     uint8_t remaining_samples;
     int16_t sample_buffer[12];
+    int16_t prev_sample;
+    int16_t prev_prev_sample;
     bool loop, end;
     uint8_t left_shift;
     uint8_t filter;
@@ -263,7 +265,6 @@ typedef struct {
     dsp_channel_t channels[8];
     uint8_t coefficients[8];
     int8_t vol_left, vol_right, echo_left, echo_right;
-    uint8_t endx;
     uint8_t echo_feedback, echo_delay;
     uint8_t pitch_mod_enable;
     uint8_t use_noise;

@@ -72,8 +72,14 @@ uint8_t spc_mmu_read(uint16_t addr, bool log) {
                            (spc.memory.disable_echo_write << 5) |
                            spc.memory.noise_freq;
                 case 0x7c:
-                    return spc.memory.endx;
-
+                    return (spc.memory.channels[0].end << 0) |
+                           (spc.memory.channels[1].end << 1) |
+                           (spc.memory.channels[2].end << 2) |
+                           (spc.memory.channels[3].end << 3) |
+                           (spc.memory.channels[4].end << 4) |
+                           (spc.memory.channels[5].end << 5) |
+                           (spc.memory.channels[6].end << 6) |
+                           (spc.memory.channels[7].end << 7);
                 default:
                     UNREACHABLE_SWITCH(spc.memory.dsp_addr);
                 }
@@ -179,9 +185,6 @@ void spc_mmu_write(uint16_t addr, uint8_t val, bool log) {
                     spc.memory.mute_all = val & 0x40;
                     spc.memory.disable_echo_write = val & 0x20;
                     spc.memory.noise_freq = val & 0x1f;
-                    break;
-                case 0x7c:
-                    spc.memory.endx = val;
                     break;
                 case 0x0d:
                     spc.memory.echo_feedback = val;
