@@ -5,7 +5,7 @@
 extern cpu_t cpu;
 extern spc_t spc;
 
-static void extract_sample(uint8_t brr, dsp_channel_t* chan, int16_t *out1,
+static void extract_sample(uint8_t brr, dsp_channel_t *chan, int16_t *out1,
                            int16_t *out2) {
     *out1 = (brr >> 4);
     if (*out1 > 7)
@@ -109,9 +109,11 @@ void audio_cb(void *buffer, unsigned int count) {
                 continue;
             }
             if (!chan->playing && chan->key_on) {
+                // channel is turned on
                 chan->key_on = false;
                 chan->playing = true;
                 chan->t = 0;
+                // reload pointers
                 uint16_t addr = (spc.memory.sample_source_directory_page << 8) +
                                 (chan->sample_source_directory << 2);
                 chan->sample_addr =
@@ -122,18 +124,20 @@ void audio_cb(void *buffer, unsigned int count) {
                 chan->filter = (spc.memory.ram[chan->sample_addr] >> 2) & 0b11;
                 chan->loop = spc.memory.ram[chan->sample_addr] & 0b10;
                 chan->end = spc.memory.ram[chan->sample_addr++] & 0b1;
+                // preload first 12 sample points (of 16) from first sample
                 for (uint8_t i = 0; i < 6; i++) {
-                    extract_sample(spc.memory.ram[chan->sample_addr++],
-                                   chan,
+                    extract_sample(spc.memory.ram[chan->sample_addr++], chan,
                                    &chan->sample_buffer[i * 2],
                                    &chan->sample_buffer[i * 2 + 1]);
                 }
-                chan->remaining_samples = 4;
+                chan->remaining_values_in_block = 4;
+                chan->refill_idx = 0;
             }
 
             chan->t += chan->pitch;
             if (chan->t >= 0xc000)
                 chan->t -= 0xc000;
+            chan->points_passed_since_refill += chan->pitch / 4096.f;
 
             if (chan->playing) {
                 // play sample
@@ -152,25 +156,25 @@ void audio_cb(void *buffer, unsigned int count) {
                 chan->output = result;
             }
             // checking if 4 sample points have been passed
-            if ((chan->t >> 12) % 4 == 0) {
+            if (chan->points_passed_since_refill >= 4) {
                 // load next 4 points
-                uint8_t to = (chan->t >> 12) - 4;
-                if (to > 12)
-                    to += 12;
                 for (uint8_t i = 0; i < 2; i++) {
-                    extract_sample(spc.memory.ram[chan->sample_addr++],
-                                   chan,
-                                   &chan->sample_buffer[to + i * 2],
-                                   &chan->sample_buffer[to + i * 2 + 1]);
+                    extract_sample(
+                        spc.memory.ram[chan->sample_addr++], chan,
+                        &chan->sample_buffer[chan->refill_idx + i * 2],
+                        &chan->sample_buffer[chan->refill_idx + i * 2 + 1]);
                 }
 
-                chan->remaining_samples -= 4;
+                chan->refill_idx += 4;
+                chan->refill_idx %= 12;
+                chan->points_passed_since_refill -= 4;
+                chan->remaining_values_in_block -= 4;
             }
-            if (chan->remaining_samples == 4 && chan->should_end) {
+            if (chan->remaining_values_in_block == 4 && chan->should_end) {
                 chan->playing = false;
                 continue;
             }
-            if (chan->remaining_samples == 0) {
+            if (chan->remaining_values_in_block == 0) {
                 chan->should_end = chan->end && !chan->loop;
                 if (chan->end && chan->loop) {
                     chan->sample_addr = chan->loop_addr;
@@ -180,23 +184,30 @@ void audio_cb(void *buffer, unsigned int count) {
                 chan->filter = (spc.memory.ram[chan->sample_addr] >> 2) & 0b11;
                 chan->loop = spc.memory.ram[chan->sample_addr] & 0b10;
                 chan->end = spc.memory.ram[chan->sample_addr++] & 0b1;
-                chan->remaining_samples = 16;
+                chan->remaining_values_in_block = 16;
             }
         }
 
-        int16_t added_output = 0;
+        int16_t added_output_left = 0;
+        int16_t added_output_right = 0;
         for (uint8_t i = 0; i < 8; i++) {
-            if (spc.memory.channels[i].playing)
-                added_output += spc.memory.channels[i].output;
+            if (spc.memory.channels[i].playing) {
+                added_output_left += spc.memory.channels[i].output *
+                                     (spc.memory.channels[i].vol_left / 128.f);
+                added_output_right +=
+                    spc.memory.channels[i].output *
+                    (spc.memory.channels[i].vol_right / 128.f);
+            }
         }
-        out[buffer_idx] = added_output;
+        out[buffer_idx * 2] = added_output_left;
+        out[buffer_idx * 2 + 1] = added_output_right;
     }
 }
 
 void apu_init(void) {
     SetTraceLogLevel(LOG_ERROR);
     InitAudioDevice();
-    spc.memory.stream = LoadAudioStream(SAMPLE_RATE, 16, 1);
+    spc.memory.stream = LoadAudioStream(SAMPLE_RATE, 16, 2);
     SetAudioStreamCallback(spc.memory.stream, audio_cb);
     PlayAudioStream(spc.memory.stream);
 }

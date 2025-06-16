@@ -233,12 +233,14 @@ typedef struct {
     uint8_t a_rate, d_rate, s_level, s_rate;
     uint8_t gain;
     uint16_t t;
+    float points_passed_since_refill;
     bool key_on, key_off, playing;
 
     uint8_t envx;
     int8_t outx;
 
-    uint8_t remaining_samples;
+    uint8_t remaining_values_in_block;
+    uint8_t refill_idx;
     int16_t sample_buffer[12];
     int16_t prev_sample;
     int16_t prev_prev_sample;
