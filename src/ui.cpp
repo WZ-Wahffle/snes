@@ -534,6 +534,11 @@ void dsp_window(void) {
         dsp_selected = 7;
     if (dsp_selected < 0)
         dsp_selected = 0;
+    if(spc.memory.channels[dsp_selected].playing) {
+        ImGui::TextColored(ImVec4{0x00, 0xff, 0x00, 0xff}, "Enabled");
+    } else {
+        ImGui::TextColored(ImVec4{0xff, 0x00, 0x00, 0xff}, "Disabled");
+    }
     ImGui::Text("Volume left: %d", spc.memory.channels[dsp_selected].vol_left);
     ImGui::Text("Volume right: %d",
                 spc.memory.channels[dsp_selected].vol_right);
@@ -548,9 +553,18 @@ void dsp_window(void) {
         ImGui::Text("SL: %d", spc.memory.channels[dsp_selected].s_level);
         ImGui::Text("SR: %d", spc.memory.channels[dsp_selected].s_rate);
     }
+    ImGui::Text("Envelope: %d", spc.memory.channels[dsp_selected].envelope);
     ImGui::End();
 }
 
+void mute_window(void) {
+    ImGui::Begin("mute");
+    for(int i = 0; i < 8; i++) {
+        ImGui::Checkbox(std::to_string(i + 1).c_str(), &spc.memory.channels[i].mute_override);
+    }
+    ImGui::End();
+}
+ 
 extern "C" {
 void cpp_init(void) {
     rlImGuiSetup(true);
@@ -574,6 +588,7 @@ void cpp_imgui_render(void) {
     cpu_rom_window();
     cpu_window();
     dsp_window();
+    mute_window();
     rlImGuiEnd();
 }
 

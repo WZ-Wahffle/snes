@@ -56,7 +56,7 @@ static void log_message(log_level_t level, char *message, ...);
 #define WINDOW_HEIGHT 224
 #define CLOCK_FREQ 21477268
 #define CYCLES_PER_DOT 4
-#define SAMPLE_RATE 30000.f
+#define SAMPLE_RATE 32000.f
 
 typedef enum { LOROM, HIROM, EXHIROM } memory_map_mode_t;
 
@@ -137,6 +137,8 @@ typedef enum {
 typedef enum { R_C, R_X, R_Y, R_S, R_D } r_t;
 
 typedef enum { BPP_2 = 2, BPP_4 = 4, BPP_8 = 8 } color_depth_t;
+
+typedef enum { ATTACK, DECAY, SUSTAIN, RELEASE } adsr_state_t;
 
 typedef struct {
     const char *name;
@@ -239,7 +241,10 @@ typedef struct {
     uint8_t envx;
     int8_t outx;
 
+    int16_t envelope;
+    adsr_state_t adsr_state;
     uint8_t remaining_values_in_block;
+    uint8_t clear_out_count;
     uint8_t refill_idx;
     int16_t sample_buffer[12];
     int16_t prev_sample;
@@ -252,6 +257,7 @@ typedef struct {
 
     bool should_end;
 
+    bool mute_override;
     int16_t output;
 } dsp_channel_t;
 

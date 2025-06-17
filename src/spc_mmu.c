@@ -182,6 +182,12 @@ void spc_mmu_write(uint16_t addr, uint8_t val, bool log) {
                     break;
                 case 0x6c:
                     spc.memory.mute_voices = val & 0x80;
+                    if(spc.memory.mute_voices) {
+                        for(uint8_t i = 0; i < 8; i++) {
+                            spc.memory.channels[i].adsr_state = RELEASE;
+                            spc.memory.channels[i].envelope = 0;
+                        }
+                    }
                     spc.memory.mute_all = val & 0x40;
                     spc.memory.disable_echo_write = val & 0x20;
                     spc.memory.noise_freq = val & 0x1f;

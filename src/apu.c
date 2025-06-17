@@ -97,20 +97,23 @@ void audio_cb(void *buffer, unsigned int count) {
     };
 
     uint16_t *out = buffer;
+    static uint16_t smp_counter = 0;
     for (uint32_t buffer_idx = 0; buffer_idx < count; buffer_idx++) {
         for (uint8_t channel_idx = 0; channel_idx < 8; channel_idx++) {
             dsp_channel_t *chan = &spc.memory.channels[channel_idx];
             if (!chan->playing && !chan->key_on) {
                 continue;
             }
-            if (chan->playing && chan->key_off) {
+            if (chan->key_off) {
                 chan->key_off = false;
-                chan->playing = false;
+                chan->adsr_state = RELEASE;
                 continue;
             }
-            if (!chan->playing && chan->key_on) {
+            if (chan->key_on) {
                 // channel is turned on
                 chan->key_on = false;
+                chan->envelope = 0;
+                chan->adsr_state = ATTACK;
                 chan->playing = true;
                 chan->t = 0;
                 // reload pointers
@@ -132,6 +135,86 @@ void audio_cb(void *buffer, unsigned int count) {
                 }
                 chan->remaining_values_in_block = 4;
                 chan->refill_idx = 0;
+            }
+
+            static const uint16_t period[] = {
+                65535, 2048, 1536, 1280, 1024, 768, 640, 512, 384, 320, 256,
+                192,   160,  128,  96,   80,   64,  48,  40,  32,  24,  20,
+                16,    12,   10,   8,    6,    5,   4,   3,   2,   1};
+            static const uint16_t offset[] = {
+              536, 0, 1040  
+            };
+
+            if (chan->adsr_enable) {
+                switch (chan->adsr_state) {
+                case ATTACK:
+                    if((smp_counter + offset[(chan->a_rate * 2 + 1) % 3]) % period[chan->a_rate * 2 + 1] == 0) {
+                        chan->envelope += chan->a_rate == 0xf ? 1024 : 32;
+                        if(chan->envelope >= 0x7ff) {
+                            chan->envelope = 0x7ff;
+                            chan->adsr_state = DECAY;
+                        }
+                    }
+                    break;
+                case DECAY:
+                    if((smp_counter + offset[(chan->d_rate * 2 + 16) % 3]) % period[chan->d_rate * 2 + 16] == 0) {
+                        chan->envelope -= ((chan->envelope - 1) >> 8) + 1;
+                        if (chan->envelope <= (chan->s_level + 1) * 256) {
+                            chan->envelope = (chan->s_level + 1) * 256;
+                            chan->adsr_state = SUSTAIN;
+                        }
+                    }
+                    break;
+                case SUSTAIN:
+                    if((smp_counter + offset[chan->s_rate % 3]) % period[chan->s_rate] == 0) {
+                        chan->envelope -= ((chan->envelope - 1) >> 8) + 1;
+                        if (chan->envelope < 0) {
+                            chan->envelope = 0;
+                        }
+                    }
+                    break;
+                case RELEASE:
+                    chan->envelope -= 8;
+                    if (chan->envelope < 0) {
+                        chan->envelope = 0;
+                        chan->playing = false;
+                    }
+                    break;
+                }
+            } else {
+                if(chan->gain & 0x80) {
+                    // direct
+                    chan->envelope = (chan->gain & 0x7f) << 4;
+                } else {
+                    uint8_t gain_value = chan->gain & 0x1f;
+                    if((smp_counter + offset[gain_value % 3]) % period[gain_value] == 0) {   
+                    switch((chan->gain >> 5) & 0b11) {
+                        case 0:
+                            chan->envelope -= 32;
+                            if(chan->envelope < 0) chan->envelope = 0;
+                            break;
+                        case 1:
+                            chan->envelope -= 1;
+                            chan->envelope -= chan->envelope >> 8;
+                            if(chan->envelope < 0) chan->envelope = 0;
+                            break;
+                        case 2:
+                            chan->envelope += 32;
+                            if(chan->envelope > 0x7ff) chan->envelope = 0x7ff;
+                            break;
+                        case 3:
+                            if(chan->envelope < 0x600) {
+                                chan->envelope += 32;
+                            } else {
+                                chan->envelope += 8;
+                            }
+                            if(chan->envelope > 0x7ff) chan->envelope = 0x7ff;
+                            break;
+                        default:
+                            UNREACHABLE_SWITCH((chan->gain >> 5) & 0b11);
+                        }
+                    }
+                }
             }
 
             chan->t += chan->pitch;
@@ -157,6 +240,12 @@ void audio_cb(void *buffer, unsigned int count) {
             }
             // checking if 4 sample points have been passed
             if (chan->points_passed_since_refill >= 4) {
+                if (chan->should_end) {
+                    chan->points_passed_since_refill -= 4;
+                    chan->clear_out_count -= 4;
+                    if (chan->clear_out_count == 0)
+                        chan->playing = false;
+                }
                 // load next 4 points
                 for (uint8_t i = 0; i < 2; i++) {
                     extract_sample(
@@ -170,37 +259,45 @@ void audio_cb(void *buffer, unsigned int count) {
                 chan->points_passed_since_refill -= 4;
                 chan->remaining_values_in_block -= 4;
             }
-            if (chan->remaining_values_in_block == 4 && chan->should_end) {
-                chan->playing = false;
-                continue;
-            }
             if (chan->remaining_values_in_block == 0) {
                 chan->should_end = chan->end && !chan->loop;
-                if (chan->end && chan->loop) {
-                    chan->sample_addr = chan->loop_addr;
-                }
 
-                chan->left_shift = spc.memory.ram[chan->sample_addr] >> 4;
-                chan->filter = (spc.memory.ram[chan->sample_addr] >> 2) & 0b11;
-                chan->loop = spc.memory.ram[chan->sample_addr] & 0b10;
-                chan->end = spc.memory.ram[chan->sample_addr++] & 0b1;
-                chan->remaining_values_in_block = 16;
+                if (chan->should_end) {
+                    chan->clear_out_count = 12;
+                } else {
+                    if (chan->end && chan->loop) {
+                        chan->sample_addr = chan->loop_addr;
+                    }
+
+                    chan->left_shift = spc.memory.ram[chan->sample_addr] >> 4;
+                    chan->filter =
+                        (spc.memory.ram[chan->sample_addr] >> 2) & 0b11;
+                    chan->loop = spc.memory.ram[chan->sample_addr] & 0b10;
+                    chan->end = spc.memory.ram[chan->sample_addr++] & 0b1;
+                    chan->remaining_values_in_block = 16;
+                }
             }
         }
 
         int16_t added_output_left = 0;
         int16_t added_output_right = 0;
         for (uint8_t i = 0; i < 8; i++) {
-            if (spc.memory.channels[i].playing) {
+            spc.memory.channels[i].outx = spc.memory.channels[i].output / 256;
+            spc.memory.channels[i].envx = spc.memory.channels[i].envelope / 16;
+            if (spc.memory.channels[i].playing && !spc.memory.channels[i].mute_override) {
                 added_output_left += spc.memory.channels[i].output *
-                                     (spc.memory.channels[i].vol_left / 128.f);
+                                     (spc.memory.channels[i].vol_left / 128.f) * (spc.memory.channels[i].envelope / 2048.f);
                 added_output_right +=
                     spc.memory.channels[i].output *
-                    (spc.memory.channels[i].vol_right / 128.f);
+                    (spc.memory.channels[i].vol_right / 128.f) * (spc.memory.channels[i].envelope / 2048.f);
             }
         }
         out[buffer_idx * 2] = added_output_left;
         out[buffer_idx * 2 + 1] = added_output_right;
+        if (smp_counter == 0)
+            smp_counter = 30720;
+        else
+            smp_counter--;
     }
 }
 
