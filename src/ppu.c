@@ -722,7 +722,6 @@ void ui(void) {
             }
         }
 
-        // if (cpu.memory.joy_auto_read) {
         cpu.memory.joy1l = 0;
         cpu.memory.joy1l |= IsGamepadButtonDown(0, GAMEPAD_R) << 4;
         cpu.memory.joy1l |= IsGamepadButtonDown(0, GAMEPAD_L) << 5;
@@ -745,7 +744,7 @@ void ui(void) {
             (GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_Y) > 0.5) << 10;
         cpu.memory.joy1l |=
             (GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_Y) < -0.5) << 11;
-        // }
+        cpu.memory.joy_latch_pending = false;
 
         UpdateTexture(texture, framebuffer);
         DrawTexturePro(texture, (Rectangle){0, 0, WINDOW_WIDTH, WINDOW_HEIGHT},

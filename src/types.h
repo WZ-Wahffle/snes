@@ -195,9 +195,9 @@ typedef struct {
     uint8_t divisor;
     bool doing_div;
 
-    bool joy_auto_read;
-    uint16_t joy1l, joy1h;
-    uint16_t joy2l, joy2h;
+    bool joy_auto_read, joy_latch_pending;
+    uint16_t joy1l, joy1h, joy1l_latched, joy1h_latched;
+    uint16_t joy2l, joy2h, joy2l_latched, joy2h_latched;
     uint8_t joy1_shift_idx, joy2_shift_idx;
 } cpu_mmu_t;
 

@@ -98,20 +98,20 @@ void audio_cb(void *buffer, unsigned int count) {
 
     uint16_t *out = buffer;
     static uint16_t smp_counter = 0;
+    static bool every_second_sample = true;
     for (uint32_t buffer_idx = 0; buffer_idx < count; buffer_idx++) {
+        every_second_sample = !every_second_sample;
         for (uint8_t channel_idx = 0; channel_idx < 8; channel_idx++) {
             dsp_channel_t *chan = &spc.memory.channels[channel_idx];
             if (!chan->playing && !chan->key_on) {
                 continue;
             }
-            if (chan->key_off) {
-                chan->key_off = false;
+            if (chan->key_off && every_second_sample) {
                 chan->adsr_state = RELEASE;
                 continue;
             }
-            if (chan->key_on) {
+            if (chan->key_on && every_second_sample) {
                 // channel is turned on
-                chan->key_on = false;
                 chan->envelope = 0;
                 chan->adsr_state = ATTACK;
                 chan->playing = true;
@@ -166,7 +166,7 @@ void audio_cb(void *buffer, unsigned int count) {
                     }
                     break;
                 case SUSTAIN:
-                    if((smp_counter + offset[chan->s_rate % 3]) % period[chan->s_rate] == 0) {
+                    if(chan->s_rate != 0 && (smp_counter + offset[chan->s_rate % 3]) % period[chan->s_rate] == 0) {
                         chan->envelope -= ((chan->envelope - 1) >> 8) + 1;
                         if (chan->envelope < 0) {
                             chan->envelope = 0;
@@ -187,7 +187,7 @@ void audio_cb(void *buffer, unsigned int count) {
                     chan->envelope = (chan->gain & 0x7f) << 4;
                 } else {
                     uint8_t gain_value = chan->gain & 0x1f;
-                    if((smp_counter + offset[gain_value % 3]) % period[gain_value] == 0) {   
+                    if(gain_value != 0 && (smp_counter + offset[gain_value % 3]) % period[gain_value] == 0) {   
                     switch((chan->gain >> 5) & 0b11) {
                         case 0:
                             chan->envelope -= 32;

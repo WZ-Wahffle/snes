@@ -104,21 +104,29 @@ uint8_t mmu_read(uint16_t addr, uint8_t bank, bool log) {
             case 0x2143:
                 return spc.memory.ram[0xf4 + (addr - 0x2140)];
             case 0x4016: {
+                if (cpu.memory.joy_latch_pending) {
+                    return (cpu.memory.joy1l & 0x8000) ? 0 : 1;
+                }
                 uint8_t ret =
-                    ((cpu.memory.joy1l >> cpu.memory.joy1_shift_idx) & 1) |
-                    (((cpu.memory.joy1h >> cpu.memory.joy1_shift_idx) & 1)
-                     << 1);
+                    ((cpu.memory.joy1l_latched & (0x8000 >> cpu.memory.joy1_shift_idx))
+                         ? 0
+                         : 1);
+                if (cpu.memory.joy1_shift_idx >= 16)
+                    ret |= 1;
                 cpu.memory.joy1_shift_idx++;
-                cpu.memory.joy1_shift_idx %= 16;
                 return ret;
             }
             case 0x4017: {
+                if(cpu.memory.joy_latch_pending) {
+                    return (cpu.memory.joy2l & 0x8000) ? 0 : 1;
+                }
                 uint8_t ret =
-                    ((cpu.memory.joy2l >> cpu.memory.joy2_shift_idx) & 1) |
-                    (((cpu.memory.joy2h >> cpu.memory.joy2_shift_idx) & 1)
-                     << 1);
+                    ((cpu.memory.joy2l_latched & (0x8000 >> cpu.memory.joy2_shift_idx))
+                         ? 0
+                         : 1);
+                if (cpu.memory.joy2_shift_idx >= 16)
+                    ret |= 1;
                 cpu.memory.joy2_shift_idx++;
-                cpu.memory.joy2_shift_idx %= 8;
                 return ret;
             }
             case 0x4210: {
@@ -621,7 +629,16 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                 cpu.memory.ramaddr |= (value & 1) << 16;
                 break;
             case 0x4016:
-                cpu.memory.joy1_shift_idx = 0;
+                if(!cpu.memory.joy_latch_pending && (value & 1)) {
+                    cpu.memory.joy1_shift_idx = 0;
+                    cpu.memory.joy2_shift_idx = 0;
+                    cpu.memory.joy1l_latched = cpu.memory.joy1l;
+                    cpu.memory.joy1h_latched = cpu.memory.joy1h;
+                    cpu.memory.joy2l_latched = cpu.memory.joy2l;
+                    cpu.memory.joy2h_latched = cpu.memory.joy2h;
+                                }
+
+                cpu.memory.joy_latch_pending = value & 1;
                 break;
             case 0x4200:
                 cpu.memory.joy_auto_read = value & 1;

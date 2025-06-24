@@ -70,7 +70,10 @@ static cart_hash_t rom_hash_lookup[] = {
     {"Earthbound", 0xb4975b60, HIROM},
     {"Puzzle Bobble", 0xc1a14c71, LOROM},
     {"Super Mario RPG", 0x834c11c2, LOROM},
-    {"Super Mario Kart", 0x2202b32f, HIROM}};
+    {"Super Mario Kart", 0x2202b32f, HIROM},
+    {"Control Test Auto", 0xdd642b6a, LOROM},
+    {"Control Test Simple", 0xc0467d5c, LOROM}
+};
 
 void at_exit(void) {
     for (uint16_t i = cpu.history_idx; i != cpu.history_idx - 1; i++) {
