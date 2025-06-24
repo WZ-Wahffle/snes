@@ -8,7 +8,9 @@ extern ppu_t ppu;
 extern spc_t spc;
 
 uint8_t framebuffer[WINDOW_WIDTH * WINDOW_HEIGHT * 4] = {0};
+uint8_t subscreen[WINDOW_WIDTH * WINDOW_HEIGHT * 4] = {0};
 uint8_t priority[WINDOW_WIDTH * WINDOW_HEIGHT] = {0};
+uint8_t priority_sub[WINDOW_WIDTH * WINDOW_HEIGHT] = {0};
 
 #define GAMEPAD_UP GAMEPAD_BUTTON_LEFT_FACE_UP
 #define GAMEPAD_DOWN GAMEPAD_BUTTON_LEFT_FACE_DOWN
@@ -293,6 +295,8 @@ void draw_bg(uint8_t bg_idx, uint16_t y, color_depth_t bpp, uint8_t low_prio,
     }
     uint32_t *target =
         (uint32_t *)(framebuffer + (WINDOW_WIDTH * 4 * screen_y));
+    uint32_t *target_sub =
+        (uint32_t *)(subscreen + (WINDOW_WIDTH * 4 * screen_y));
     uint8_t tilemap_w = ppu.bg_config[bg_idx].double_h_tilemap ? 64 : 32;
     uint8_t tilemap_h = ppu.bg_config[bg_idx].double_v_tilemap ? 64 : 32;
     uint16_t tilemap_line_pointer = ppu.bg_config[bg_idx].tilemap_addr;
@@ -374,21 +378,19 @@ void draw_bg(uint8_t bg_idx, uint16_t y, color_depth_t bpp, uint8_t low_prio,
             default:
                 UNREACHABLE_SWITCH(ppu.bg_config[bg_idx].mask_logic);
             }
+        uint8_t tile_x_off = (x + ppu.bg_config[bg_idx].h_scroll) % tile_size;
+        if ((tilemap_fetch[tilemap_idx] >> 14) & 1)
+            tile_x_off = tile_size - 1 - tile_x_off;
+        uint8_t palette = (tilemap_fetch[tilemap_idx] >> 10) & 0b111;
 
-        if (priority[screen_y * WINDOW_WIDTH + screen_x] <
+        if (ppu.bg_config[bg_idx].main_screen_enable && priority[screen_y * WINDOW_WIDTH + screen_x] <
             (prio ? high_prio : low_prio)) {
-            if (blocked) {
+            if (blocked && ppu.bg_config[bg_idx].main_window_enable) {
                 target[screen_x] = 0xff000000;
                 priority[screen_y * WINDOW_WIDTH + screen_x] =
                     prio ? high_prio : low_prio;
                 continue;
             }
-
-            uint8_t tile_x_off =
-                (x + ppu.bg_config[bg_idx].h_scroll) % tile_size;
-            if ((tilemap_fetch[tilemap_idx] >> 14) & 1)
-                tile_x_off = tile_size - 1 - tile_x_off;
-            uint8_t palette = (tilemap_fetch[tilemap_idx] >> 10) & 0b111;
 
             if (out[tilemap_idx * tile_size + tile_x_off] != 0) {
                 target[screen_x] = r5g5b5_to_r8g8b8a8(
@@ -396,6 +398,21 @@ void draw_bg(uint8_t bg_idx, uint16_t y, color_depth_t bpp, uint8_t low_prio,
                               out[tilemap_idx * tile_size + tile_x_off]]);
                 priority[screen_y * WINDOW_WIDTH + screen_x] =
                     prio ? high_prio : low_prio;
+            }
+        }
+
+        if(ppu.bg_config[bg_idx].sub_screen_enable && priority_sub[screen_y * WINDOW_WIDTH + screen_x] < (prio ? high_prio : low_prio)) {
+            if(blocked && ppu.bg_config[bg_idx].sub_window_enable) {
+                target_sub[screen_x] = 0xff000000;
+                priority_sub[screen_y * WINDOW_WIDTH + screen_x] = prio ? high_prio : low_prio;
+                continue;
+            }
+
+            if(out[tilemap_idx * tile_size + tile_x_off] != 0) {
+                target_sub[screen_x] = r5g5b5_to_r8g8b8a8(
+                    ppu.cgram[palette * bpp * bpp +
+                              out[tilemap_idx * tile_size + tile_x_off]]);
+                priority_sub[screen_y * WINDOW_WIDTH + screen_x] = prio ? high_prio : low_prio;
             }
         }
     }
@@ -427,6 +444,7 @@ void draw_obj(uint16_t y) {
 
     // step 2: drawing (lower index, higher priority)
     uint32_t *target = (uint32_t *)(framebuffer + (WINDOW_WIDTH * 4 * y));
+    uint32_t *target_sub = (uint32_t *)(subscreen + (WINDOW_WIDTH * 4 * y));
 
     for (uint8_t i = 0; i < 128; i++) {
         if (ppu.oam[i].draw_this_line) {
@@ -488,22 +506,40 @@ void draw_obj(uint16_t y) {
                         UNREACHABLE_SWITCH(ppu.obj_window_mask_logic);
                     }
 
-                if (tiles[x_off] != 0 &&
-                    priority[y * WINDOW_WIDTH + x] < prio) {
+                if (ppu.obj_main_screen_enable && priority[y * WINDOW_WIDTH + x] < prio) {
                     if (x < 0 || x > 255)
                         continue;
-                    if (blocked) {
+                    if (blocked && ppu.obj_main_window_enable) {
                         target[x] = 0xff000000;
                         priority[y * WINDOW_WIDTH + x] = prio;
                         continue;
                     }
 
-                    uint32_t col = r5g5b5_to_r8g8b8a8(
-                        ppu.cgram[128 + ppu.oam[i].palette * 16 +
-                                  tiles[x_off]]);
+                    if (tiles[x_off] != 0) {
+                        uint32_t col = r5g5b5_to_r8g8b8a8(
+                            ppu.cgram[128 + ppu.oam[i].palette * 16 +
+                                      tiles[x_off]]);
 
-                    target[x] = col;
-                    priority[y * WINDOW_WIDTH + x] = prio;
+                        target[x] = col;
+                        priority[y * WINDOW_WIDTH + x] = prio;
+                    }
+                }
+
+                if(ppu.obj_sub_screen_enable && priority_sub[y * WINDOW_WIDTH + x] < prio) {
+                    if(x < 0 || x > 255) {
+                        continue;
+                    }
+                    if(blocked && ppu.obj_sub_window_enable) {
+                        target_sub[x] = 0xff000000;
+                        priority_sub[y * WINDOW_WIDTH + x] = prio;
+                        continue;
+                    }
+
+                    if(tiles[x_off] != 0) {
+                        uint32_t col = r5g5b5_to_r8g8b8a8(ppu.cgram[128 + ppu.oam[i].palette * 16 + tiles[x_off]]);
+                        target_sub[x] = col;
+                        priority_sub[y * WINDOW_WIDTH + x] = prio;
+                    }
                 }
             }
         }
@@ -635,9 +671,14 @@ void try_step_ppu(void) {
 
         if (ppu.beam_x == 22 && ppu.beam_y > 0 && ppu.beam_y < 225) {
             for (uint16_t i = 0; i < 256; i++) {
+                uint32_t col = r5g5b5_to_r8g8b8a8(ppu.fixed_color);
                 ((uint32_t *)framebuffer)[(ppu.beam_y - 1) * WINDOW_WIDTH + i] =
-                    r5g5b5_to_r8g8b8a8(ppu.fixed_color);
+                    col;
+                ((uint32_t *)subscreen)[(ppu.beam_y - 1) * WINDOW_WIDTH + i] =
+                    col;
                 priority[(ppu.beam_y - 1) * WINDOW_WIDTH + i] = 0;
+                priority_sub[(ppu.beam_y - 1) * WINDOW_WIDTH + i] = 0;
+
             }
             if (ppu.bg_mode == 0) {
                 draw_bg(0, ppu.beam_y - 1, BPP_2, 7, 10);
@@ -656,6 +697,14 @@ void try_step_ppu(void) {
                 draw_bg(1, ppu.beam_y - 1, BPP_4, 1, 7);
             }
             draw_obj(ppu.beam_y - 1);
+            for(uint16_t i = 0; i < 256; i++) {
+                if(priority[(ppu.beam_y - 1) * WINDOW_WIDTH + i] == 0) {
+                    ((uint32_t *)
+                         framebuffer)[(ppu.beam_y - 1) * WINDOW_WIDTH + i] =
+                        ((uint32_t *)
+                             subscreen)[(ppu.beam_y - 1) * WINDOW_WIDTH + i];
+                }
+            }
         }
     }
 }
@@ -756,7 +805,8 @@ void ui(void) {
         }
 
         if (IsKeyPressed(KEY_F10)) {
-            cpu.state = STATE_RUNNING;
+
+            cpu.state = cpu.state == STATE_RUNNING ? STATE_STOPPED : STATE_RUNNING;
         }
 
         if (IsKeyPressed(KEY_END)) {
