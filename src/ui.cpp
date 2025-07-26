@@ -20,10 +20,10 @@ void cpu_window(void) {
             std::fstream f;
             f.open(std::string(cpu.file_name) + ".wsav",
                    f.binary | f.out | f.trunc);
-            f << cpu.memory.sram_size;
-            for (uint32_t i = 0; i < cpu.memory.sram_size; i++) {
-                f << cpu.memory.sram[i];
-            }
+            f.write(reinterpret_cast<char *>(&cpu.memory.sram_size),
+                    sizeof(cpu.memory.sram_size));
+            f.write(reinterpret_cast<char *>(cpu.memory.sram),
+                    cpu.memory.sram_size);
             f.close();
             confirm_save = false;
         } else {
@@ -36,11 +36,10 @@ void cpu_window(void) {
             std::fstream f;
             f.open(std::string(cpu.file_name) + ".wsav", f.binary | f.in);
             uint32_t sram_size;
-            f >> sram_size;
+            f.read(reinterpret_cast<char *>(&sram_size), sizeof(sram_size));
             if (cpu.memory.sram_size == sram_size) {
-                for (uint32_t i = 0; i < cpu.memory.sram_size; i++) {
-                    f >> cpu.memory.sram[i];
-                }
+                f.read(reinterpret_cast<char *>(cpu.memory.sram),
+                       cpu.memory.sram_size);
             }
             f.close();
             confirm_load = false;
@@ -527,14 +526,15 @@ void cpu_rom_window(void) {
 int dsp_selected = 0;
 void dsp_window(void) {
     ImGui::Begin("dsp", NULL, ImGuiWindowFlags_HorizontalScrollbar);
-    ImGui::Text("Sample Directory Page: 0x%04x", spc.memory.sample_source_directory_page << 8);
+    ImGui::Text("Sample Directory Page: 0x%04x",
+                spc.memory.sample_source_directory_page << 8);
     ImGui::InputInt("Channel", &dsp_selected, 1, 1,
                     ImGuiInputTextFlags_CharsDecimal);
     if (dsp_selected > 7)
         dsp_selected = 7;
     if (dsp_selected < 0)
         dsp_selected = 0;
-    if(spc.memory.channels[dsp_selected].playing) {
+    if (spc.memory.channels[dsp_selected].playing) {
         ImGui::TextColored(ImVec4{0x00, 0xff, 0x00, 0xff}, "Enabled");
     } else {
         ImGui::TextColored(ImVec4{0xff, 0x00, 0x00, 0xff}, "Disabled");
@@ -559,12 +559,12 @@ void dsp_window(void) {
 
 void mute_window(void) {
     ImGui::Begin("mute");
-    for(int i = 0; i < 8; i++) {
-        ImGui::Checkbox(std::to_string(i + 1).c_str(), &spc.memory.channels[i].mute_override);
+    for (int i = 0; i < 8; i++) {
+        ImGui::Checkbox(std::to_string(i + 1).c_str(),
+                        &spc.memory.channels[i].mute_override);
     }
     ImGui::End();
 }
- 
 extern "C" {
 void cpp_init(void) {
     rlImGuiSetup(true);
