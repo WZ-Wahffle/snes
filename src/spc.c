@@ -178,8 +178,8 @@ void spc_execute(void) {
     log_message(LOG_LEVEL_VERBOSE, "SPC fetched opcode 0x%02x", opcode);
     // The SPC700 technically resides on its own clock, but this would make
     // synchronization awkward in emulation, so instead cycle counts are
-    // multiplied by 21 which is roughly accurate to the lower clock frequency
-    spc.remaining_clocks -= 21 * spc_cycle_counts[opcode];
+    // multiplied by this factor which is roughly accurate to the lower clock frequency
+    spc.remaining_clocks -= 20.9765625 * spc_cycle_counts[opcode];
     timer_timer += spc_cycle_counts[opcode];
     fast_timer_timer += spc_cycle_counts[opcode];
     if (fast_timer_timer >= 16) {

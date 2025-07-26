@@ -727,8 +727,6 @@ void ui(void) {
         BeginDrawing();
         ClearBackground(GetColor(SWAP_ENDIAN(r5g5b5_to_r8g8b8a8(ppu.fixed_color)))));
 
-        // cpu.remaining_clocks += 357368;
-        // try_step_cpu();
         for (uint32_t i = 0; i < 341 * 262 * cpu.speed; i++) {
             switch (cpu.state) {
             case STATE_STOPPED:

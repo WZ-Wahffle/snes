@@ -107,11 +107,17 @@ void audio_cb(void *buffer, unsigned int count) {
                 continue;
             }
             if (chan->key_off && every_second_sample) {
+                chan->key_off = false;
+                spc.memory.key_off &= ~(1 << channel_idx);
                 chan->adsr_state = RELEASE;
                 continue;
             }
             if (chan->key_on && every_second_sample) {
+                if(channel_idx == 0)
+                    printf("on in dsp\n");
                 // channel is turned on
+                chan->key_on = false;
+                spc.memory.key_on &= ~(1 << channel_idx);
                 chan->envelope = 0;
                 chan->adsr_state = ATTACK;
                 chan->playing = true;
@@ -141,23 +147,25 @@ void audio_cb(void *buffer, unsigned int count) {
                 65535, 2048, 1536, 1280, 1024, 768, 640, 512, 384, 320, 256,
                 192,   160,  128,  96,   80,   64,  48,  40,  32,  24,  20,
                 16,    12,   10,   8,    6,    5,   4,   3,   2,   1};
-            static const uint16_t offset[] = {
-              536, 0, 1040  
-            };
+            static const uint16_t offset[] = {536, 0, 1040};
 
             if (chan->adsr_enable) {
                 switch (chan->adsr_state) {
                 case ATTACK:
-                    if((smp_counter + offset[(chan->a_rate * 2 + 1) % 3]) % period[chan->a_rate * 2 + 1] == 0) {
+                    if ((smp_counter + offset[(chan->a_rate * 2 + 1) % 3]) %
+                            period[chan->a_rate * 2 + 1] ==
+                        0) {
                         chan->envelope += chan->a_rate == 0xf ? 1024 : 32;
-                        if(chan->envelope >= 0x7ff) {
+                        if (chan->envelope >= 0x7ff) {
                             chan->envelope = 0x7ff;
                             chan->adsr_state = DECAY;
                         }
                     }
                     break;
                 case DECAY:
-                    if((smp_counter + offset[(chan->d_rate * 2 + 16) % 3]) % period[chan->d_rate * 2 + 16] == 0) {
+                    if ((smp_counter + offset[(chan->d_rate * 2 + 16) % 3]) %
+                            period[chan->d_rate * 2 + 16] ==
+                        0) {
                         chan->envelope -= ((chan->envelope - 1) >> 8) + 1;
                         if (chan->envelope <= (chan->s_level + 1) * 256) {
                             chan->envelope = (chan->s_level + 1) * 256;
@@ -166,7 +174,10 @@ void audio_cb(void *buffer, unsigned int count) {
                     }
                     break;
                 case SUSTAIN:
-                    if(chan->s_rate != 0 && (smp_counter + offset[chan->s_rate % 3]) % period[chan->s_rate] == 0) {
+                    if (chan->s_rate != 0 &&
+                        (smp_counter + offset[chan->s_rate % 3]) %
+                                period[chan->s_rate] ==
+                            0) {
                         chan->envelope -= ((chan->envelope - 1) >> 8) + 1;
                         if (chan->envelope < 0) {
                             chan->envelope = 0;
@@ -182,33 +193,40 @@ void audio_cb(void *buffer, unsigned int count) {
                     break;
                 }
             } else {
-                if(chan->gain & 0x80) {
+                if (chan->gain & 0x80) {
                     // direct
                     chan->envelope = (chan->gain & 0x7f) << 4;
                 } else {
                     uint8_t gain_value = chan->gain & 0x1f;
-                    if(gain_value != 0 && (smp_counter + offset[gain_value % 3]) % period[gain_value] == 0) {   
-                    switch((chan->gain >> 5) & 0b11) {
+                    if (gain_value != 0 &&
+                        (smp_counter + offset[gain_value % 3]) %
+                                period[gain_value] ==
+                            0) {
+                        switch ((chan->gain >> 5) & 0b11) {
                         case 0:
                             chan->envelope -= 32;
-                            if(chan->envelope < 0) chan->envelope = 0;
+                            if (chan->envelope < 0)
+                                chan->envelope = 0;
                             break;
                         case 1:
                             chan->envelope -= 1;
                             chan->envelope -= chan->envelope >> 8;
-                            if(chan->envelope < 0) chan->envelope = 0;
+                            if (chan->envelope < 0)
+                                chan->envelope = 0;
                             break;
                         case 2:
                             chan->envelope += 32;
-                            if(chan->envelope > 0x7ff) chan->envelope = 0x7ff;
+                            if (chan->envelope > 0x7ff)
+                                chan->envelope = 0x7ff;
                             break;
                         case 3:
-                            if(chan->envelope < 0x600) {
+                            if (chan->envelope < 0x600) {
                                 chan->envelope += 32;
                             } else {
                                 chan->envelope += 8;
                             }
-                            if(chan->envelope > 0x7ff) chan->envelope = 0x7ff;
+                            if (chan->envelope > 0x7ff)
+                                chan->envelope = 0x7ff;
                             break;
                         default:
                             UNREACHABLE_SWITCH((chan->gain >> 5) & 0b11);
@@ -243,8 +261,9 @@ void audio_cb(void *buffer, unsigned int count) {
                 if (chan->should_end) {
                     chan->points_passed_since_refill -= 4;
                     chan->clear_out_count -= 4;
-                    if (chan->clear_out_count == 0)
+                    if (chan->clear_out_count == 0) {
                         chan->playing = false;
+                    }
                 }
                 // load next 4 points
                 for (uint8_t i = 0; i < 2; i++) {
@@ -284,12 +303,15 @@ void audio_cb(void *buffer, unsigned int count) {
         for (uint8_t i = 0; i < 8; i++) {
             spc.memory.channels[i].outx = spc.memory.channels[i].output / 256;
             spc.memory.channels[i].envx = spc.memory.channels[i].envelope / 16;
-            if (spc.memory.channels[i].playing && !spc.memory.channels[i].mute_override) {
+            if (spc.memory.channels[i].playing &&
+                !spc.memory.channels[i].mute_override) {
                 added_output_left += spc.memory.channels[i].output *
-                                     (spc.memory.channels[i].vol_left / 128.f) * (spc.memory.channels[i].envelope / 2048.f);
+                                     (spc.memory.channels[i].vol_left / 128.f) *
+                                     (spc.memory.channels[i].envelope / 2048.f);
                 added_output_right +=
                     spc.memory.channels[i].output *
-                    (spc.memory.channels[i].vol_right / 128.f) * (spc.memory.channels[i].envelope / 2048.f);
+                    (spc.memory.channels[i].vol_right / 128.f) *
+                    (spc.memory.channels[i].envelope / 2048.f);
             }
         }
         out[buffer_idx * 2] = added_output_left;
