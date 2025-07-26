@@ -98,23 +98,19 @@ void audio_cb(void *buffer, unsigned int count) {
 
     uint16_t *out = buffer;
     static uint16_t smp_counter = 0;
-    static bool every_second_sample = true;
     for (uint32_t buffer_idx = 0; buffer_idx < count; buffer_idx++) {
-        every_second_sample = !every_second_sample;
         for (uint8_t channel_idx = 0; channel_idx < 8; channel_idx++) {
             dsp_channel_t *chan = &spc.memory.channels[channel_idx];
             if (!chan->playing && !chan->key_on) {
                 continue;
             }
-            if (chan->key_off && every_second_sample) {
+            if (chan->key_off) {
                 chan->key_off = false;
                 spc.memory.key_off &= ~(1 << channel_idx);
                 chan->adsr_state = RELEASE;
                 continue;
             }
-            if (chan->key_on && every_second_sample) {
-                if(channel_idx == 0)
-                    printf("on in dsp\n");
+            if (chan->key_on) {
                 // channel is turned on
                 chan->key_on = false;
                 spc.memory.key_on &= ~(1 << channel_idx);

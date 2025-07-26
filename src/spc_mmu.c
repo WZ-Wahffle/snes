@@ -171,13 +171,17 @@ void spc_mmu_write(uint16_t addr, uint8_t val, bool log) {
                 case 0x4c:
                     spc.memory.key_on = val;
                     for (uint8_t i = 0; i < 8; i++) {
-                        spc.memory.channels[i].key_on = val & (1 << i);
+                        if (val & (1 << i)) {
+                            spc.memory.channels[i].key_on = true;
+                        }
                     }
                     break;
                 case 0x5c:
                     spc.memory.key_off = val;
                     for (uint8_t i = 0; i < 8; i++) {
-                        spc.memory.channels[i].key_off = val & (1 << i);
+                        if (val & (1 << i)) {
+                            spc.memory.channels[i].key_off = true;
+                        }
                     }
                     break;
                 case 0x6c:
