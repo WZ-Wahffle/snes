@@ -157,9 +157,10 @@ void ppu_window(void) {
     ImGui::Text("Window 2: %d-%d", ppu.window_2_l, ppu.window_2_r);
     ImGui::Text("Beam X: %d", ppu.beam_x);
     ImGui::Text("Beam Y: %d", ppu.beam_y);
-    ImGui::Text("H Target: %d", ppu.h_timer_target);
-    ImGui::Text("V Target: %d", ppu.v_timer_target);
-    ImGui::Text("Target Mode: %d", cpu.timer_irq);
+    ImGui::Text("H Timer Target: %d", ppu.h_timer_target);
+    ImGui::Text("V Timer Target: %d", ppu.v_timer_target);
+    ImGui::Text("Timer Target Mode: %d", cpu.timer_irq);
+    ImGui::Text("BG Mode 1 BG3 elevate: %s", ppu.mode_1_bg3_prio ? "true" : "false");
     ImGui::End();
 }
 
@@ -185,6 +186,8 @@ void bg_window(void) {
     if (bg_selected < 0)
         bg_selected = 0;
 
+    ImGui::Text("Main: %sabled", ppu.bg_config[bg_selected].main_screen_enable ? "en" : "dis");
+    ImGui::Text("Sub:  %sabled", ppu.bg_config[bg_selected].sub_screen_enable ? "en" : "dis");
     ImGui::Text("Tile Data Addr: 0x%02x",
                 ppu.bg_config[bg_selected].tiledata_addr);
     ImGui::Text("Tile Map Addr: 0x%02x",
