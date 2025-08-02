@@ -163,14 +163,6 @@ typedef struct {
     memory_map_mode_t mode;
     uint8_t coprocessor;
 
-    struct dsp1_t {
-        bool command_happened;
-        uint8_t command;
-        uint8_t read_bytes_r, written_bytes_r, read_bytes, written_bytes;
-        uint8_t operands[14];
-        uint8_t outputs[6];
-    } dsp1;
-
     struct dma_t {
         bool hdma_enable;
         bool direction;
