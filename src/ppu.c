@@ -700,6 +700,10 @@ void try_step_ppu(void) {
                 draw_bg(2, ppu.beam_y - 1, BPP_2, 1,
                         ppu.mode_1_bg3_prio ? 12 : 4);
             }
+            if (ppu.bg_mode == 2) {
+                draw_bg(0, ppu.beam_y - 1, BPP_4, 4, 10);
+                draw_bg(1, ppu.beam_y - 1, BPP_4, 1, 7);
+            }
             if (ppu.bg_mode == 3) {
                 draw_bg(0, ppu.beam_y - 1, BPP_8, 4, 10);
                 draw_bg(1, ppu.beam_y - 1, BPP_4, 1, 7);
@@ -734,7 +738,8 @@ void ui(void) {
         BeginDrawing();
         ClearBackground(GetColor(SWAP_ENDIAN(r5g5b5_to_r8g8b8a8(ppu.fixed_color)))));
 
-        for (uint32_t i = 0; i < 341 * 262 * cpu.speed * (GetFrameTime() / 0.0166f); i++) {
+        for (uint32_t i = 0;
+             i < 341 * 262 * cpu.speed * (GetFrameTime() / 0.0166f); i++) {
             switch (cpu.state) {
             case STATE_STOPPED:
                 // this page intentionally left blank
