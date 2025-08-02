@@ -482,7 +482,7 @@ OP(sbc) {
     } else {
         uint16_t data = tmp;
         data = ~data;
-        uint32_t result;
+        int32_t result;
 
         if (!get_status_bit(STATUS_BCD)) {
             result = cpu.c + data + get_status_bit(STATUS_CARRY);
