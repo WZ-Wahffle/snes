@@ -149,6 +149,7 @@ void cpu_window(void) {
 void ppu_window(void) {
     ImGui::Begin("ppu", NULL, ImGuiWindowFlags_HorizontalScrollbar);
     ImGui::Text("BG Mode: %d", ppu.bg_mode);
+    ImGui::Text("Brightness: %f", ppu.brightness / 15.f);
     ImGui::Text("VRAM Address: 0x%04x", ppu.vram_addr);
     ImGui::Text("VRAM Address Remapping Index: %d", ppu.address_remapping);
     ImGui::Text("VRAM Address Increment Amount Index: %d",
@@ -160,7 +161,8 @@ void ppu_window(void) {
     ImGui::Text("H Timer Target: %d", ppu.h_timer_target);
     ImGui::Text("V Timer Target: %d", ppu.v_timer_target);
     ImGui::Text("Timer Target Mode: %d", cpu.timer_irq);
-    ImGui::Text("BG Mode 1 BG3 elevate: %s", ppu.mode_1_bg3_prio ? "true" : "false");
+    ImGui::Text("BG Mode 1 BG3 elevate: %s",
+                ppu.mode_1_bg3_prio ? "true" : "false");
     ImGui::End();
 }
 
@@ -186,8 +188,10 @@ void bg_window(void) {
     if (bg_selected < 0)
         bg_selected = 0;
 
-    ImGui::Text("Main: %sabled", ppu.bg_config[bg_selected].main_screen_enable ? "en" : "dis");
-    ImGui::Text("Sub:  %sabled", ppu.bg_config[bg_selected].sub_screen_enable ? "en" : "dis");
+    ImGui::Text("Main: %sabled",
+                ppu.bg_config[bg_selected].main_screen_enable ? "en" : "dis");
+    ImGui::Text("Sub:  %sabled",
+                ppu.bg_config[bg_selected].sub_screen_enable ? "en" : "dis");
     ImGui::Text("Tile Data Addr: 0x%02x",
                 ppu.bg_config[bg_selected].tiledata_addr);
     ImGui::Text("Tile Map Addr: 0x%02x",
@@ -587,7 +591,9 @@ void cpp_imgui_render(void) {
     bg_window();
     oam_window();
     cpu_ram_window();
-    cpu_sram_window();
+    if (cpu.memory.sram_size > 0) {
+        cpu_sram_window();
+    }
     cpu_rom_window();
     cpu_window();
     dsp_window();

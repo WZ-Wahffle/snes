@@ -58,7 +58,10 @@ uint8_t mmu_read(uint16_t addr, uint8_t bank, bool log) {
             return ret;
         }
         if (bank >= 0x70 && bank <= 0x7d) {
-            return cpu.memory.sram[addr % cpu.memory.sram_size];
+            if (cpu.memory.sram_size > 0) {
+                return cpu.memory.sram[addr % cpu.memory.sram_size];
+            }
+            return 0xff;
         }
         break;
     case HIROM:
@@ -70,6 +73,13 @@ uint8_t mmu_read(uint16_t addr, uint8_t bank, bool log) {
                             "Read 0x%02x from ROM address 0x%04x, bank 0x%02x",
                             ret, addr, bank);
             return ret;
+        }
+        if (((bank >= 0x30 && bank < 0x40) || (bank >= 0xb0 && bank < 0xc0)) &&
+            addr >= 0x6000 && addr < 0x8000) {
+            if (cpu.memory.sram_size > 0) {
+                return cpu.memory.sram[(addr - 0x6000) % cpu.memory.sram_size];
+            }
+            return 0xff;
         }
         break;
     case EXHIROM:
@@ -107,23 +117,23 @@ uint8_t mmu_read(uint16_t addr, uint8_t bank, bool log) {
                 if (cpu.memory.joy_latch_pending) {
                     return (cpu.memory.joy1l & 0x8000) ? 0 : 1;
                 }
-                uint8_t ret =
-                    ((cpu.memory.joy1l_latched & (0x8000 >> cpu.memory.joy1_shift_idx))
-                         ? 0
-                         : 1);
+                uint8_t ret = ((cpu.memory.joy1l_latched &
+                                (0x8000 >> cpu.memory.joy1_shift_idx))
+                                   ? 0
+                                   : 1);
                 if (cpu.memory.joy1_shift_idx >= 16)
                     ret |= 1;
                 cpu.memory.joy1_shift_idx++;
                 return ret;
             }
             case 0x4017: {
-                if(cpu.memory.joy_latch_pending) {
+                if (cpu.memory.joy_latch_pending) {
                     return (cpu.memory.joy2l & 0x8000) ? 0 : 1;
                 }
-                uint8_t ret =
-                    ((cpu.memory.joy2l_latched & (0x8000 >> cpu.memory.joy2_shift_idx))
-                         ? 0
-                         : 1);
+                uint8_t ret = ((cpu.memory.joy2l_latched &
+                                (0x8000 >> cpu.memory.joy2_shift_idx))
+                                   ? 0
+                                   : 1);
                 if (cpu.memory.joy2_shift_idx >= 16)
                     ret |= 1;
                 cpu.memory.joy2_shift_idx++;
@@ -279,8 +289,17 @@ static uint8_t transfer_patterns[8][4] = {
     {0, 1, 2, 3}, {0, 1, 0, 1}, {0, 0, 0, 0}, {0, 0, 1, 1}};
 
 void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
-    if (bank >= 0x70 && bank <= 0x7d) {
-        cpu.memory.sram[addr % cpu.memory.sram_size] = value;
+    if (cpu.memory.mode == LOROM && bank >= 0x70 && bank <= 0x7d) {
+        if (cpu.memory.sram_size > 0) {
+            cpu.memory.sram[addr % cpu.memory.sram_size] = value;
+        }
+    } else if (cpu.memory.mode == HIROM &&
+               ((bank >= 0x30 && bank < 0x40) ||
+                (bank >= 0xb0 && bank < 0xc0)) &&
+               addr >= 0x6000 && addr < 0x8000) {
+        if (cpu.memory.sram_size > 0) {
+            cpu.memory.sram[(addr - 0x6000) & cpu.memory.sram_size] = value;
+        }
     } else if ((bank < 0x40 || (bank >= 0x80 && bank < 0xc0)) &&
                addr < 0x8000) {
         if (addr < 0x2000) {
@@ -485,7 +504,7 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                     ppu.cgram_latched = true;
                 } else {
                     ppu.cgram[ppu.cgram_addr++] =
-                        TO_U16(ppu.cgram_latch, value);
+                        r5g5b5_to_r8g8b8a8(TO_U16(ppu.cgram_latch, value));
                     ppu.cgram_latched = false;
                 }
                 break;
@@ -587,17 +606,16 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                 break;
             case 0x2132:
                 if (value & 0x80) {
-                    ppu.fixed_color &= ~(0x1f << 10);
-                    ppu.fixed_color |= (value & 0x1f) << 10;
+                    ppu.fixed_color_b = value & 0x1f;
                 }
                 if (value & 0x40) {
-                    ppu.fixed_color &= ~(0x1f << 5);
-                    ppu.fixed_color |= (value & 0x1f) << 5;
+                    ppu.fixed_color_g = value & 0x1f;
                 }
                 if (value & 0x20) {
-                    ppu.fixed_color &= ~(0x1f << 0);
-                    ppu.fixed_color |= (value & 0x1f) << 0;
+                    ppu.fixed_color_r = value & 0x1f;
                 }
+                ppu.fixed_color_24bit = r5g5b5_components_to_r8g8b8a8(
+                    ppu.fixed_color_r, ppu.fixed_color_g, ppu.fixed_color_b);
                 break;
             case 0x2133:
                 ppu.display_config = value;
@@ -629,14 +647,14 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                 cpu.memory.ramaddr |= (value & 1) << 16;
                 break;
             case 0x4016:
-                if(!cpu.memory.joy_latch_pending && (value & 1)) {
+                if (!cpu.memory.joy_latch_pending && (value & 1)) {
                     cpu.memory.joy1_shift_idx = 0;
                     cpu.memory.joy2_shift_idx = 0;
                     cpu.memory.joy1l_latched = cpu.memory.joy1l;
                     cpu.memory.joy1h_latched = cpu.memory.joy1h;
                     cpu.memory.joy2l_latched = cpu.memory.joy2l;
                     cpu.memory.joy2h_latched = cpu.memory.joy2h;
-                                }
+                }
 
                 cpu.memory.joy_latch_pending = value & 1;
                 break;
@@ -835,6 +853,45 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                 cpu.memory.dmas[(addr - 0x4300) / 16].dma_byte_count &= 0xffff;
                 cpu.memory.dmas[(addr - 0x4300) / 16].dma_byte_count |= value
                                                                         << 16;
+                break;
+            case 0x4308:
+            case 0x4318:
+            case 0x4328:
+            case 0x4338:
+            case 0x4348:
+            case 0x4358:
+            case 0x4368:
+            case 0x4378:
+                cpu.memory.dmas[(addr - 0x4300) / 16].hdma_current_address &=
+                    0xffff00;
+                cpu.memory.dmas[(addr - 0x4300) / 16].hdma_current_address |=
+                    value;
+                break;
+            case 0x4309:
+            case 0x4319:
+            case 0x4329:
+            case 0x4339:
+            case 0x4349:
+            case 0x4359:
+            case 0x4369:
+            case 0x4379:
+                cpu.memory.dmas[(addr - 0x4300) / 16].hdma_current_address &=
+                    0xff00ff;
+                cpu.memory.dmas[(addr - 0x4300) / 16].hdma_current_address |=
+                    value << 8;
+                break;
+            case 0x430a:
+            case 0x431a:
+            case 0x432a:
+            case 0x433a:
+            case 0x434a:
+            case 0x435a:
+            case 0x436a:
+            case 0x437a:
+                cpu.memory.dmas[(addr - 0x4300) / 16].scanlines_left =
+                    value & 0x7f;
+                cpu.memory.dmas[(addr - 0x4300) / 16].hdma_repeat =
+                    value & 0x80;
                 break;
             default:
                 log_message(

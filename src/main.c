@@ -72,8 +72,8 @@ static cart_hash_t rom_hash_lookup[] = {
     {"Super Mario RPG", 0x834c11c2, LOROM},
     {"Super Mario Kart", 0x2202b32f, HIROM},
     {"Control Test Auto", 0xdd642b6a, LOROM},
-    {"Control Test Simple", 0xc0467d5c, LOROM}
-};
+    {"Control Test Simple", 0xc0467d5c, LOROM},
+    {"Donkey Kong Country", 0xc1a8ad4c, HIROM}};
 
 void at_exit(void) {
     for (uint16_t i = cpu.history_idx; i != cpu.history_idx - 1; i++) {
@@ -150,10 +150,19 @@ int main(int argc, char **argv) {
     cpu.memory.coprocessor = header[0x16] >> 8;
     cpu.memory.rom_size = pow(2, header[0x17]) * 1024;
     cpu.memory.rom = calloc(cpu.memory.rom_size, 1);
-    cpu.memory.sram_size = pow(2, header[0x18]) * 1024;
-    cpu.memory.sram = calloc(cpu.memory.sram_size, 1);
-    for (uint32_t i = 0; i < cpu.memory.sram_size; i++) {
-        cpu.memory.sram[i] = 0xff;
+    if (header[0x16] == 0x00 || ((header[0x16] & 0xf) == 0x3) ||
+        ((header[0x16] & 0xf) == 0x6)) {
+        // since the size of the cart RAM is calculated with 1 << N, it is
+        // impossible to specify for the ram to not exist using just this field.
+        // Therefore, information is taken from the cart type to establish if
+        // the cart should have RAM or not
+        cpu.memory.sram_size = 0;
+    } else {
+        cpu.memory.sram_size = pow(2, header[0x18]) * 1024;
+        cpu.memory.sram = calloc(cpu.memory.sram_size, 1);
+        for (uint32_t i = 0; i < cpu.memory.sram_size; i++) {
+            cpu.memory.sram[i] = 0xff;
+        }
     }
     memcpy(cpu.memory.rom, file_to_hash, MIN(file_size, cpu.memory.rom_size));
     cpu.memory.mode = mode;

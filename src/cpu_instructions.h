@@ -97,4 +97,5 @@ OP(brk);
 OP(cop);
 OP(pea);
 OP(pei);
+OP(wai);
 #endif

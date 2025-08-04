@@ -11,6 +11,7 @@ uint8_t framebuffer[WINDOW_WIDTH * WINDOW_HEIGHT * 4] = {0};
 uint8_t subscreen[WINDOW_WIDTH * WINDOW_HEIGHT * 4] = {0};
 uint8_t priority[WINDOW_WIDTH * WINDOW_HEIGHT] = {0};
 uint8_t priority_sub[WINDOW_WIDTH * WINDOW_HEIGHT] = {0};
+bool use_color_math[WINDOW_WIDTH] = {0};
 
 #define GAMEPAD_UP GAMEPAD_BUTTON_LEFT_FACE_UP
 #define GAMEPAD_DOWN GAMEPAD_BUTTON_LEFT_FACE_DOWN
@@ -43,6 +44,7 @@ void try_step_cpu(void) {
                 break;
             }
         }
+        bool any_interrupt_happened = true;
         bool curr_vblank =
             cpu.vblank_nmi_enable && cpu.memory.vblank_has_occurred;
         if (curr_vblank && !prev_vblank) {
@@ -82,6 +84,11 @@ void try_step_cpu(void) {
             cpu.pc = read_16(cpu.emulation_mode ? 0xfffe : 0xffee, 0);
             cpu.pbr = 0;
             cpu.irq = false;
+        } else {
+            any_interrupt_happened = false;
+        }
+        if (cpu.waiting && any_interrupt_happened) {
+            cpu.waiting = false;
         }
         prev_vblank = curr_vblank;
     }
@@ -105,11 +112,15 @@ void try_step_spc(void) {
 }
 
 uint32_t r5g5b5_to_r8g8b8a8(uint16_t in) {
+    return r5g5b5_components_to_r8g8b8a8(in >> 0, in >> 5, in >> 10);
+}
+
+uint32_t r5g5b5_components_to_r8g8b8a8(uint8_t r, uint8_t g, uint8_t b) {
     float brightness = ppu.brightness / 15.f;
     uint32_t ret = 0xff000000;
-    ret |= (uint32_t)(((in >> 0) & 0x1f) * brightness) << 3;
-    ret |= (uint32_t)(((in >> 5) & 0x1f) * brightness) << 11;
-    ret |= (uint32_t)(((in >> 10) & 0x1f) * brightness) << 19;
+    ret |= (uint32_t)((r & 0x1f) * brightness) << 3;
+    ret |= (uint32_t)((g & 0x1f) * brightness) << 11;
+    ret |= (uint32_t)((b & 0x1f) * brightness) << 19;
     return ret;
 }
 
@@ -394,11 +405,13 @@ void draw_bg(uint8_t bg_idx, uint16_t y, color_depth_t bpp, uint8_t low_prio,
             }
 
             if (out[tilemap_idx * tile_size + tile_x_off] != 0) {
-                target[screen_x] = r5g5b5_to_r8g8b8a8(
+                target[screen_x] =
                     ppu.cgram[palette * bpp * bpp +
-                              out[tilemap_idx * tile_size + tile_x_off]]);
+                              out[tilemap_idx * tile_size + tile_x_off]];
                 priority[screen_y * WINDOW_WIDTH + screen_x] =
                     prio ? high_prio : low_prio;
+                use_color_math[screen_x] =
+                    ppu.bg_config[bg_idx].color_math_enable;
             }
         }
 
@@ -413,9 +426,9 @@ void draw_bg(uint8_t bg_idx, uint16_t y, color_depth_t bpp, uint8_t low_prio,
             }
 
             if (out[tilemap_idx * tile_size + tile_x_off] != 0) {
-                target_sub[screen_x] = r5g5b5_to_r8g8b8a8(
+                target_sub[screen_x] =
                     ppu.cgram[palette * bpp * bpp +
-                              out[tilemap_idx * tile_size + tile_x_off]]);
+                              out[tilemap_idx * tile_size + tile_x_off]];
                 priority_sub[screen_y * WINDOW_WIDTH + screen_x] =
                     prio ? high_prio : low_prio;
             }
@@ -522,12 +535,12 @@ void draw_obj(uint16_t y) {
                     }
 
                     if (tiles[x_off] != 0) {
-                        uint32_t col = r5g5b5_to_r8g8b8a8(
-                            ppu.cgram[128 + ppu.oam[i].palette * 16 +
-                                      tiles[x_off]]);
+                        uint32_t col = ppu.cgram[128 + ppu.oam[i].palette * 16 +
+                                                 tiles[x_off]];
 
                         target[x] = col;
                         priority[y * WINDOW_WIDTH + x] = prio;
+                        use_color_math[x] = ppu.obj_color_math_enable;
                     }
                 }
 
@@ -543,9 +556,8 @@ void draw_obj(uint16_t y) {
                     }
 
                     if (tiles[x_off] != 0) {
-                        uint32_t col = r5g5b5_to_r8g8b8a8(
-                            ppu.cgram[128 + ppu.oam[i].palette * 16 +
-                                      tiles[x_off]]);
+                        uint32_t col = ppu.cgram[128 + ppu.oam[i].palette * 16 +
+                                                 tiles[x_off]];
                         target_sub[x] = col;
                         priority_sub[y * WINDOW_WIDTH + x] = prio;
                     }
@@ -679,14 +691,14 @@ void try_step_ppu(void) {
         }
 
         if (ppu.beam_x == 22 && ppu.beam_y > 0 && ppu.beam_y < 225) {
-            for (uint16_t i = 0; i < 256; i++) {
-                uint32_t col = r5g5b5_to_r8g8b8a8(ppu.fixed_color);
+            for (uint16_t i = 0; i < WINDOW_WIDTH; i++) {
                 ((uint32_t *)framebuffer)[(ppu.beam_y - 1) * WINDOW_WIDTH + i] =
-                    col;
+                    ppu.fixed_color_24bit;
                 ((uint32_t *)subscreen)[(ppu.beam_y - 1) * WINDOW_WIDTH + i] =
-                    col;
+                    ppu.fixed_color_24bit;
                 priority[(ppu.beam_y - 1) * WINDOW_WIDTH + i] = 0;
                 priority_sub[(ppu.beam_y - 1) * WINDOW_WIDTH + i] = 0;
+                use_color_math[i] = 0;
             }
             if (ppu.bg_mode == 0) {
                 draw_bg(0, ppu.beam_y - 1, BPP_2, 7, 10);
@@ -709,7 +721,126 @@ void try_step_ppu(void) {
                 draw_bg(1, ppu.beam_y - 1, BPP_4, 1, 7);
             }
             draw_obj(ppu.beam_y - 1);
-            for (uint16_t i = 0; i < 256; i++) {
+            for (uint16_t i = 0; i < WINDOW_WIDTH; i++) {
+                if (false) {
+                    bool window_1 = false;
+                    if (ppu.col_window_1_enable) {
+                        window_1 =
+                            IN_INTERVAL(i, ppu.window_1_l, ppu.window_1_r) ^
+                            ppu.col_window_1_invert;
+                    }
+                    bool window_2 = false;
+                    if (ppu.col_window_2_enable) {
+                        window_2 =
+                            IN_INTERVAL(i, ppu.window_2_l, ppu.window_2_r) ^
+                            ppu.col_window_2_invert;
+                    }
+                    bool blocked;
+                    if (!ppu.col_window_1_enable && !ppu.col_window_2_enable) {
+                        blocked = false;
+                    } else if (ppu.col_window_1_enable &&
+                               !ppu.col_window_2_enable) {
+                        blocked = window_1;
+                    } else if (!ppu.col_window_1_enable &&
+                               ppu.col_window_2_enable) {
+                        blocked = window_2;
+                    } else
+                        switch (ppu.col_window_mask_logic) {
+                        case 0:
+                            blocked = window_1 || window_2;
+                            break;
+                        case 1:
+                            blocked = window_1 && window_2;
+                            break;
+                        case 2:
+                            blocked = window_1 ^ window_2;
+                            break;
+                        case 3:
+                            blocked = window_1 == window_2;
+                            break;
+                        default:
+                            UNREACHABLE_SWITCH(ppu.col_window_mask_logic);
+                        }
+
+                    switch (ppu.main_window_black_region) {
+                    case 0:
+                        // this page intentionally left blank
+                        break;
+                    case 1:
+                        if (!blocked) {
+                            ((uint32_t *)
+                                 framebuffer)[(ppu.beam_y - 1) * WINDOW_WIDTH +
+                                              i] = 0xff000000;
+                            continue;
+                        }
+                        break;
+                    case 2:
+                        if (blocked) {
+                            ((uint32_t *)
+                                 framebuffer)[(ppu.beam_y - 1) * WINDOW_WIDTH +
+                                              i] = 0xff000000;
+                            continue;
+                        }
+                        break;
+                    case 3:
+                        ((uint32_t *)
+                             framebuffer)[(ppu.beam_y - 1) * WINDOW_WIDTH + i] =
+                            0xff000000;
+                        continue;
+                    }
+                    switch (ppu.sub_window_transparent_region) {
+                    case 0:
+                        // this page intentionally left blank
+                        break;
+                    case 1:
+                        if (!blocked) {
+                            continue;
+                        }
+                        break;
+                    case 2:
+                        if (blocked) {
+                            continue;
+                        }
+                        break;
+                    case 3:
+                        continue;
+                    }
+
+                    int32_t main =
+                        ((uint32_t *)
+                             framebuffer)[(ppu.beam_y - 1) * WINDOW_WIDTH + i] &
+                        0xffffff;
+                    int32_t to_add =
+                        ppu.addend_subscreen
+                            ? ((uint32_t *)
+                                   subscreen)[(ppu.beam_y - 1) * WINDOW_WIDTH +
+                                              i] &
+                                  0xffffff
+                            : ppu.fixed_color_24bit;
+                    int32_t r, g, b;
+                    if (ppu.color_math_subtract) {
+                        r = ((main >> 3) & 0xff) - ((to_add >> 3) & 0xff);
+                        g = ((main >> 11) & 0xff) - ((to_add >> 11) & 0xff);
+                        b = ((main >> 19) & 0xff) - ((to_add >> 19) & 0xff);
+
+                    } else {
+                        r = ((main >> 3) & 0xff) + ((to_add >> 3) & 0xff);
+                        g = ((main >> 11) & 0xff) + ((to_add >> 11) & 0xff);
+                        b = ((main >> 19) & 0xff) + ((to_add >> 19) & 0xff);
+                    }
+                    if (ppu.half_color_math) {
+                        r /= 2;
+                        g /= 2;
+                        b /= 2;
+                    }
+                    r = MIN(255, MAX(0, r));
+                    g = MIN(255, MAX(0, g));
+                    b = MIN(255, MAX(0, b));
+                    ((uint32_t *)
+                         framebuffer)[(ppu.beam_y - 1) * WINDOW_WIDTH + i] =
+                        r | (g << 8) | (b << 16) | 0xff000000;
+                }
+
                 if (priority[(ppu.beam_y - 1) * WINDOW_WIDTH + i] == 0) {
                     ((uint32_t *)
                          framebuffer)[(ppu.beam_y - 1) * WINDOW_WIDTH + i] =
@@ -736,7 +867,7 @@ void ui(void) {
 
     while (!WindowShouldClose()) {
         BeginDrawing();
-        ClearBackground(GetColor(SWAP_ENDIAN(r5g5b5_to_r8g8b8a8(ppu.fixed_color)))));
+        ClearBackground(GetColor(SWAP_ENDIAN(ppu.fixed_color_24bit))));
 
         for (uint32_t i = 0;
              i < 341 * 262 * cpu.speed * (GetFrameTime() / 0.0166f); i++) {

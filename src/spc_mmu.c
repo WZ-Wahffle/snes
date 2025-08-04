@@ -18,6 +18,8 @@ uint8_t spc_mmu_read(uint16_t addr, bool log) {
         return ipl_boot_rom[addr - 0xffc0];
     } else if (addr >= 0xf0 && addr < 0x100) {
         switch (addr) {
+        case 0xf0:
+            return 0x0a;
         case 0xf2:
             return spc.memory.dsp_addr;
         case 0xf3: {
@@ -90,6 +92,10 @@ uint8_t spc_mmu_read(uint16_t addr, bool log) {
                 switch (spc.memory.dsp_addr) {
                 case 0x0d:
                     return spc.memory.echo_feedback;
+                case 0x3d:
+                    return spc.memory.use_noise;
+                case 0x4d:
+                    return spc.memory.echo_enable;
                 case 0x7d:
                     return spc.memory.echo_delay;
                 default:

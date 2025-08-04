@@ -369,6 +369,11 @@ static uint8_t cpu_cycle_counts[] = {
 };
 
 void cpu_execute(void) {
+    if (cpu.waiting) {
+        // WAI opcode, CPU is in low power mode while waiting for interrupts
+        cpu.remaining_clocks = 0;
+        return;
+    }
     uint8_t opcode = next_8();
     log_message(LOG_LEVEL_VERBOSE, "CPU fetched opcode 0x%02x", opcode);
     cpu.opcode_history[cpu.history_idx] = opcode;
@@ -991,6 +996,9 @@ void cpu_execute(void) {
         break;
     case 0xca:
         dex(AM_IMP);
+        break;
+    case 0xcb:
+        wai(AM_IMP);
         break;
     case 0xcc:
         cpy(AM_ABS);

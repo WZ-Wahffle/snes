@@ -42,7 +42,6 @@ static void log_message(log_level_t level, char *message, ...);
 #define U16_HIBYTE(val) (((val) >> 8) & 0xff)
 #define U24_LOSHORT(val) ((val) & 0xffff)
 #define U24_HIBYTE(val) (((val) >> 16) & 0xff)
-#define R5G5B5_TO_R8G8B8A8(val) ()
 #define IN_INTERVAL(val, min, max) ((val) >= (min) && (val) < (max))
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
@@ -202,6 +201,7 @@ typedef struct {
     bool irq;
     bool brk;
     bool cop;
+    bool waiting;
 
     char *file_name;
 
@@ -339,7 +339,8 @@ typedef struct {
     bool backdrop_color_math_enable;
     bool half_color_math;
     bool color_math_subtract;
-    uint16_t fixed_color;
+    uint8_t fixed_color_r, fixed_color_g, fixed_color_b;
+    uint32_t fixed_color_24bit;
 
     bool direct_color_mode;
     bool addend_subscreen;
@@ -360,7 +361,7 @@ typedef struct {
     uint8_t cgram_addr;
     bool cgram_latched;
     uint8_t cgram_latch;
-    uint16_t cgram[0x100];
+    uint32_t cgram[0x100];
 
     uint8_t obj_sprite_size;
     uint8_t obj_name_select;
@@ -428,8 +429,8 @@ EXTERNC void spc_push_8(uint8_t val);
 EXTERNC void spc_push_16(uint16_t val);
 EXTERNC uint8_t spc_pop_8(void);
 EXTERNC uint16_t spc_pop_16(void);
-
-void dsp1_write(uint8_t);
+EXTERNC uint32_t r5g5b5_to_r8g8b8a8(uint16_t in);
+EXTERNC uint32_t r5g5b5_components_to_r8g8b8a8(uint8_t r, uint8_t g, uint8_t b);
 
 static void log_message(log_level_t level, char *message, ...) {
 #ifdef LOG_LEVEL

@@ -1234,3 +1234,8 @@ OP(pei) {
 
     push_16(read_16(U24_LOSHORT(addr), U24_HIBYTE(addr)));
 }
+
+OP(wai) {
+    LEGALADDRMODES(AM_IMP);
+    cpu.waiting = true;
+}
