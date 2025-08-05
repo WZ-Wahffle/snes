@@ -279,6 +279,26 @@ void oam_window(void) {
     ImGui::End();
 }
 
+void col_window(void) {
+    ImGui::Begin("col", NULL, ImGuiWindowFlags_HorizontalScrollbar);
+    if (ImGui::BeginTable("##cols", 4,
+                          ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
+        for (uint16_t i = 0; i < 64; i++) {
+            for (uint8_t j = 0; j < 4; j++) {
+                ImGui::TableNextColumn();
+                ImGui::Text("%08x", ppu.cgram[i * 4 + j]);
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("0x%02x", i * 4 + j);
+                }
+            }
+            if (i != 63)
+                ImGui::TableNextRow();
+        }
+        ImGui::EndTable();
+    }
+    ImGui::End();
+}
+
 int dma_selected = 0;
 void dma_window(void) {
     ImGui::Begin("dma", NULL, ImGuiWindowFlags_HorizontalScrollbar);
@@ -590,6 +610,7 @@ void cpp_imgui_render(void) {
     ppu_window();
     bg_window();
     oam_window();
+    col_window();
     cpu_ram_window();
     if (cpu.memory.sram_size > 0) {
         cpu_sram_window();

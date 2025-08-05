@@ -116,11 +116,18 @@ uint32_t r5g5b5_to_r8g8b8a8(uint16_t in) {
 }
 
 uint32_t r5g5b5_components_to_r8g8b8a8(uint8_t r, uint8_t g, uint8_t b) {
-    float brightness = ppu.brightness / 15.f;
     uint32_t ret = 0xff000000;
-    ret |= (uint32_t)((r & 0x1f) * brightness) << 3;
-    ret |= (uint32_t)((g & 0x1f) * brightness) << 11;
-    ret |= (uint32_t)((b & 0x1f) * brightness) << 19;
+    ret |= (uint32_t)((r & 0x1f)) << 3;
+    ret |= (uint32_t)((g & 0x1f)) << 11;
+    ret |= (uint32_t)((b & 0x1f)) << 19;
+    return ret;
+}
+
+uint32_t brightness_adjust(uint32_t col) {
+    uint32_t ret = 0xff000000;
+    ret |= (uint32_t)((col & 0x0000ff) * (ppu.brightness / 15.f)) & 0x0000ff;
+    ret |= (uint32_t)((col & 0x00ff00) * (ppu.brightness / 15.f)) & 0x00ff00;
+    ret |= (uint32_t)((col & 0xff0000) * (ppu.brightness / 15.f)) & 0xff0000;
     return ret;
 }
 
@@ -405,9 +412,9 @@ void draw_bg(uint8_t bg_idx, uint16_t y, color_depth_t bpp, uint8_t low_prio,
             }
 
             if (out[tilemap_idx * tile_size + tile_x_off] != 0) {
-                target[screen_x] =
+                target[screen_x] = brightness_adjust(
                     ppu.cgram[palette * bpp * bpp +
-                              out[tilemap_idx * tile_size + tile_x_off]];
+                              out[tilemap_idx * tile_size + tile_x_off]]);
                 priority[screen_y * WINDOW_WIDTH + screen_x] =
                     prio ? high_prio : low_prio;
                 use_color_math[screen_x] =
@@ -426,9 +433,9 @@ void draw_bg(uint8_t bg_idx, uint16_t y, color_depth_t bpp, uint8_t low_prio,
             }
 
             if (out[tilemap_idx * tile_size + tile_x_off] != 0) {
-                target_sub[screen_x] =
+                target_sub[screen_x] = brightness_adjust(
                     ppu.cgram[palette * bpp * bpp +
-                              out[tilemap_idx * tile_size + tile_x_off]];
+                              out[tilemap_idx * tile_size + tile_x_off]]);
                 priority_sub[screen_y * WINDOW_WIDTH + screen_x] =
                     prio ? high_prio : low_prio;
             }
@@ -535,9 +542,9 @@ void draw_obj(uint16_t y) {
                     }
 
                     if (tiles[x_off] != 0) {
-                        uint32_t col = ppu.cgram[128 + ppu.oam[i].palette * 16 +
-                                                 tiles[x_off]];
-
+                        uint32_t col = brightness_adjust(
+                            ppu.cgram[128 + ppu.oam[i].palette * 16 +
+                                      tiles[x_off]]);
                         target[x] = col;
                         priority[y * WINDOW_WIDTH + x] = prio;
                         use_color_math[x] = ppu.obj_color_math_enable;
@@ -556,8 +563,8 @@ void draw_obj(uint16_t y) {
                     }
 
                     if (tiles[x_off] != 0) {
-                        uint32_t col = ppu.cgram[128 + ppu.oam[i].palette * 16 +
-                                                 tiles[x_off]];
+                        uint32_t col = brightness_adjust(ppu.cgram[128 + ppu.oam[i].palette * 16 +
+                                                 tiles[x_off]]);
                         target_sub[x] = col;
                         priority_sub[y * WINDOW_WIDTH + x] = prio;
                     }
