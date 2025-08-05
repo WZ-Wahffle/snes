@@ -163,6 +163,12 @@ void ppu_window(void) {
     ImGui::Text("Timer Target Mode: %d", cpu.timer_irq);
     ImGui::Text("BG Mode 1 BG3 elevate: %s",
                 ppu.mode_1_bg3_prio ? "true" : "false");
+    if (ppu.bg_mode == 7) {
+        ImGui::Text("M7 right -> right: %f", ppu.a_7);
+        ImGui::Text("M7 down -> right: %f", ppu.b_7);
+        ImGui::Text("M7 right -> down: %f", ppu.c_7);
+        ImGui::Text("M7 down -> down: %f", ppu.d_7);
+    }
     ImGui::End();
 }
 

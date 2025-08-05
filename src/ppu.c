@@ -443,6 +443,52 @@ void draw_bg(uint8_t bg_idx, uint16_t y, color_depth_t bpp, uint8_t low_prio,
     }
 }
 
+void draw_bg_1_mode_7(int16_t y) {
+    if (!ppu.bg_config[0].main_screen_enable &&
+        !ppu.bg_config[0].sub_screen_enable)
+        return;
+    if (ppu.enable_bg_override[0])
+        return;
+    int16_t screen_y = y;
+    uint32_t *target =
+        (uint32_t *)(framebuffer + (WINDOW_WIDTH * 4 * screen_y));
+    uint32_t *target_sub =
+        (uint32_t *)(subscreen + (WINDOW_WIDTH * 4 * screen_y));
+    for (int16_t screen_x = 0; screen_x < WINDOW_WIDTH; screen_x++) {
+        int16_t x = ppu.mode_7_center_x;
+        y = ppu.mode_7_center_y;
+        x += (screen_x - ppu.mode_7_center_x) * ppu.a_7 +
+            (screen_y - ppu.mode_7_center_y) * ppu.b_7;
+        y += (screen_x - ppu.mode_7_center_x) * ppu.c_7 +
+            (screen_y - ppu.mode_7_center_y) * ppu.d_7;
+        if (x < 0 || y < 0 || x >= 1024 || y >= 1024) {
+            if (ppu.mode_7_tilemap_repeat) {
+                x %= 1024;
+                y %= 1024;
+            } else {
+                if (ppu.mode_7_non_tilemap_fill) {
+                    x = 0;
+                    y = 0;
+                } else {
+                    continue;
+                }
+            }
+        }
+        if (ppu.bg_config[0].enable_mosaic) {
+            y -= y % (ppu.mosaic_size + 1);
+        }
+        if (ppu.bg_config[0].enable_mosaic) {
+            x -= x % (ppu.mosaic_size + 1);
+        }
+        uint16_t tile_number = (y / 8) * 128 + (x / 8);
+        uint16_t tile_idx = ppu.vram[tile_number * 2];
+        uint8_t palette_idx =
+            ppu.vram[tile_idx * 128 + (2 * (x % 8)) + (2 * (y % 8) * 8) + 1];
+        target[screen_x] = ppu.cgram[palette_idx];
+        target_sub[screen_x] = ppu.cgram[palette_idx];
+    }
+}
+
 void draw_obj(uint16_t y) {
     static uint8_t size_lut[8][4] = {
         {8, 8, 16, 16},   {8, 8, 32, 32},   {8, 8, 64, 64},   {16, 16, 32, 32},
@@ -563,8 +609,9 @@ void draw_obj(uint16_t y) {
                     }
 
                     if (tiles[x_off] != 0) {
-                        uint32_t col = brightness_adjust(ppu.cgram[128 + ppu.oam[i].palette * 16 +
-                                                 tiles[x_off]]);
+                        uint32_t col = brightness_adjust(
+                            ppu.cgram[128 + ppu.oam[i].palette * 16 +
+                                      tiles[x_off]]);
                         target_sub[x] = col;
                         priority_sub[y * WINDOW_WIDTH + x] = prio;
                     }
@@ -726,6 +773,9 @@ void try_step_ppu(void) {
             if (ppu.bg_mode == 3) {
                 draw_bg(0, ppu.beam_y - 1, BPP_8, 4, 10);
                 draw_bg(1, ppu.beam_y - 1, BPP_4, 1, 7);
+            }
+            if (ppu.bg_mode == 7) {
+                draw_bg_1_mode_7(ppu.beam_y - 1);
             }
             draw_obj(ppu.beam_y - 1);
             for (uint16_t i = 0; i < WINDOW_WIDTH; i++) {
