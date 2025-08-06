@@ -774,6 +774,10 @@ void try_step_ppu(void) {
                 draw_bg(0, ppu.beam_y - 1, BPP_8, 4, 10);
                 draw_bg(1, ppu.beam_y - 1, BPP_4, 1, 7);
             }
+            if(ppu.bg_mode == 4) {
+                draw_bg(0, ppu.beam_y - 1, BPP_8, 4, 10);
+                draw_bg(1, ppu.beam_y - 1, BPP_2, 1, 7);
+            }
             if (ppu.bg_mode == 7) {
                 draw_bg_1_mode_7(ppu.beam_y - 1);
             }
