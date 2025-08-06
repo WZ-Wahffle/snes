@@ -319,7 +319,7 @@ void draw_bg(uint8_t bg_idx, uint16_t y, color_depth_t bpp, uint8_t low_prio,
     uint8_t tilemap_h = ppu.bg_config[bg_idx].double_v_tilemap ? 64 : 32;
     uint16_t tilemap_line_pointer = ppu.bg_config[bg_idx].tilemap_addr;
     uint8_t tile_size = ppu.bg_config[bg_idx].large_characters ? 16 : 8;
-    uint8_t tile_index_v = ((y + ppu.bg_config[bg_idx].v_scroll) / tile_size);
+    uint8_t tile_index_v = (((y + ppu.bg_config[bg_idx].v_scroll) % WINDOW_WIDTH) / tile_size);
     if (tile_index_v > 31 && tilemap_w == 64 && tilemap_h == 64) {
         tilemap_line_pointer += 0x1000;
     }
@@ -355,7 +355,7 @@ void draw_bg(uint8_t bg_idx, uint16_t y, color_depth_t bpp, uint8_t low_prio,
             x -= x % (ppu.mosaic_size + 1);
         }
         uint8_t tilemap_idx =
-            ((x + ppu.bg_config[bg_idx].h_scroll) / tile_size) % 64;
+            (((x + ppu.bg_config[bg_idx].h_scroll) % WINDOW_WIDTH) / tile_size) % 64;
         bool prio = tilemap_fetch[tilemap_idx] & 0x2000;
 
         bool window_1 = false;
