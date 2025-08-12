@@ -60,8 +60,8 @@ void cpu_window(void) {
     ImGui::SameLine();
     if (ImGui::Button("Dump State")) {
         for (uint16_t i = cpu.history_idx; i != cpu.history_idx - 1; i++) {
-            printf("0x%06x: 0x%02x\n", cpu.pc_history[i],
-                   cpu.opcode_history[i]);
+            printf("0x%06x: 0x%02x\t 0x%04x: 0x%02x\n", cpu.pc_history[i],
+                   cpu.opcode_history[i], spc.pc_history[i], spc.opcode_history[i]);
         }
     }
     ImGui::Text("Speed: %.4lfx", cpu.speed);

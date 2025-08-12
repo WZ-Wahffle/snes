@@ -290,6 +290,10 @@ typedef struct {
     uint16_t breakpoint;
     bool enable_ipl;
     bool brk;
+
+    uint8_t opcode_history[0x10000];
+    uint16_t pc_history[0x10000];
+    uint16_t history_idx;
 } spc_t;
 
 typedef struct {

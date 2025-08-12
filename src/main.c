@@ -76,8 +76,9 @@ static cart_hash_t rom_hash_lookup[] = {
     {"Donkey Kong Country", 0xc1a8ad4c, HIROM}};
 
 void at_exit(void) {
-    for (uint16_t i = cpu.history_idx; i != cpu.history_idx - 1; i++) {
-        printf("0x%06x: 0x%02x\n", cpu.pc_history[i], cpu.opcode_history[i]);
+    for (uint16_t i = cpu.history_idx, j = spc.history_idx; i != cpu.history_idx - 1; i++, j++) {
+        printf("0x%06x: 0x%02x\t 0x%04x: 0x%02x\n", cpu.pc_history[i],
+               cpu.opcode_history[i], spc.pc_history[j], spc.opcode_history[j]);
     }
 }
 

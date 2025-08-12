@@ -176,6 +176,9 @@ void spc_execute(void) {
     static uint8_t timer_timer = 0, fast_timer_timer = 0;
     uint8_t opcode = spc_next_8();
     log_message(LOG_LEVEL_VERBOSE, "SPC fetched opcode 0x%02x", opcode);
+    spc.opcode_history[spc.history_idx] = opcode;
+    spc.pc_history[spc.history_idx] = spc.pc;
+    spc.history_idx++;
     // The SPC700 technically resides on its own clock, but this would make
     // synchronization awkward in emulation, so instead cycle counts are
     // multiplied by this factor which is roughly accurate to the lower clock
