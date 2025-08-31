@@ -73,7 +73,9 @@ static cart_hash_t rom_hash_lookup[] = {
     {"Super Mario Kart", 0x2202b32f, HIROM},
     {"Control Test Auto", 0xdd642b6a, LOROM},
     {"Control Test Simple", 0xc0467d5c, LOROM},
-    {"Donkey Kong Country", 0xc1a8ad4c, HIROM}};
+    {"Donkey Kong Country", 0xc1a8ad4c, HIROM},
+    {"Aging Test ROM", 0x35a123c5, LOROM}
+};
 
 void at_exit(void) {
     for (uint16_t i = cpu.history_idx, j = spc.history_idx; i != cpu.history_idx - 1; i++, j++) {
@@ -149,7 +151,7 @@ int main(int argc, char **argv) {
                 (uint32_t)pow(2, (double)(header[0x18])));
 
     cpu.memory.coprocessor = header[0x16] >> 8;
-    cpu.memory.rom_size = pow(2, header[0x17]) * 1024;
+    cpu.memory.rom_size = file_size;// pow(2, header[0x17]) * 1024;
     cpu.memory.rom = calloc(cpu.memory.rom_size, 1);
     if (header[0x16] == 0x00 || ((header[0x16] & 0xf) == 0x3) ||
         ((header[0x16] & 0xf) == 0x6)) {
