@@ -207,6 +207,7 @@ typedef struct {
 
     emu_state_t state;
     double speed;
+    bool break_next_frame;
 
     breakpoint_t *breakpoints;
     uint32_t breakpoints_size;
@@ -306,6 +307,8 @@ typedef struct {
     bool address_increment_mode;
     double remaining_clocks;
     uint16_t beam_x, beam_y;
+    bool beam_x_latch, beam_y_latch, counter_latch;
+    uint16_t beam_x_latch_content, beam_y_latch_content;
     uint8_t mosaic_size;
     uint16_t h_timer_target, v_timer_target;
 
@@ -354,13 +357,16 @@ typedef struct {
     bool mode_7_flip_h, mode_7_flip_v, mode_7_non_tilemap_fill,
         mode_7_tilemap_repeat;
     uint16_t mode_7_center_x, mode_7_center_y;
-    int16_t mul_factor_1, mul_factor_2;
-    uint16_t c_7_buffer, d_7_buffer;
+    int16_t mul_factor_1;
+    int8_t mul_factor_2;
+    uint16_t a_7_buffer, b_7_buffer, c_7_buffer, d_7_buffer;
     float a_7, b_7, c_7, d_7;
     uint8_t mode_7_latch;
 
     uint16_t vram_addr;
     uint8_t vram[0x10000];
+    uint8_t vram_latch_l;
+    uint8_t vram_latch_h;
 
     uint8_t cgram_addr;
     bool cgram_latched;
@@ -433,6 +439,7 @@ EXTERNC void spc_push_8(uint8_t val);
 EXTERNC void spc_push_16(uint16_t val);
 EXTERNC uint8_t spc_pop_8(void);
 EXTERNC uint16_t spc_pop_16(void);
+EXTERNC uint16_t r8g8b8a8_to_r5g5b5(uint32_t in);
 EXTERNC uint32_t r5g5b5_to_r8g8b8a8(uint16_t in);
 EXTERNC uint32_t r5g5b5_components_to_r8g8b8a8(uint8_t r, uint8_t g, uint8_t b);
 

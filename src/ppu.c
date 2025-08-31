@@ -111,6 +111,14 @@ void try_step_spc(void) {
     }
 }
 
+uint16_t r8g8b8a8_to_r5g5b5(uint32_t in) {
+    uint16_t ret = 0;
+    ret |= ((in >> 3) & 0x1f) << 0;
+    ret |= ((in >> 11) & 0x1f) << 5;
+    ret |= ((in >> 19) & 0x1f) << 10;
+    return ret;
+}
+
 uint32_t r5g5b5_to_r8g8b8a8(uint16_t in) {
     return r5g5b5_components_to_r8g8b8a8(in >> 0, in >> 5, in >> 10);
 }
@@ -321,7 +329,8 @@ void draw_bg(uint8_t bg_idx, uint16_t y, color_depth_t bpp, uint8_t low_prio,
     uint8_t tile_size = ppu.bg_config[bg_idx].large_characters ? 16 : 8;
     uint16_t window_height = tilemap_h * tile_size;
     uint16_t window_width = tilemap_w * tile_size;
-    uint8_t tile_index_v = (((y + ppu.bg_config[bg_idx].v_scroll) % window_height) / tile_size);
+    uint8_t tile_index_v =
+        (((y + ppu.bg_config[bg_idx].v_scroll) % window_height) / tile_size);
     if (tile_index_v > 31 && tilemap_w == 64 && tilemap_h == 64) {
         tilemap_line_pointer += 0x1000;
     }
@@ -357,7 +366,9 @@ void draw_bg(uint8_t bg_idx, uint16_t y, color_depth_t bpp, uint8_t low_prio,
             x -= x % (ppu.mosaic_size + 1);
         }
         uint8_t tilemap_idx =
-            (((x + ppu.bg_config[bg_idx].h_scroll) % window_width) / tile_size) % 64;
+            (((x + ppu.bg_config[bg_idx].h_scroll) % window_width) /
+             tile_size) %
+            64;
         bool prio = tilemap_fetch[tilemap_idx] & 0x2000;
 
         bool window_1 = false;
@@ -460,9 +471,9 @@ void draw_bg_1_mode_7(int16_t y) {
         int16_t x = ppu.mode_7_center_x;
         y = ppu.mode_7_center_y;
         x += (screen_x - ppu.mode_7_center_x) * ppu.a_7 +
-            (screen_y - ppu.mode_7_center_y) * ppu.b_7;
+             (screen_y - ppu.mode_7_center_y) * ppu.b_7;
         y += (screen_x - ppu.mode_7_center_x) * ppu.c_7 +
-            (screen_y - ppu.mode_7_center_y) * ppu.d_7;
+             (screen_y - ppu.mode_7_center_y) * ppu.d_7;
         if (x < 0 || y < 0 || x >= 1024 || y >= 1024) {
             if (ppu.mode_7_tilemap_repeat) {
                 x %= 1024;
@@ -647,8 +658,13 @@ void try_step_ppu(void) {
             }
         }
 
-        if (ppu.beam_x == 0 && ppu.beam_y == 225)
+        if (ppu.beam_x == 0 && ppu.beam_y == 225) {
             cpu.memory.vblank_has_occurred = true;
+            if (cpu.break_next_frame && cpu.state == STATE_RUNNING) {
+                cpu.state = STATE_STOPPED;
+                cpu.break_next_frame = false;
+            }
+        }
         if (ppu.beam_x == 339 && ppu.beam_y == 261)
             cpu.memory.vblank_has_occurred = false;
 
@@ -747,6 +763,8 @@ void try_step_ppu(void) {
         }
 
         if (ppu.beam_x == 22 && ppu.beam_y > 0 && ppu.beam_y < 225) {
+            if (ppu.force_blanking)
+                return;
             for (uint16_t i = 0; i < WINDOW_WIDTH; i++) {
                 ((uint32_t *)framebuffer)[(ppu.beam_y - 1) * WINDOW_WIDTH + i] =
                     ppu.fixed_color_24bit;
@@ -776,7 +794,7 @@ void try_step_ppu(void) {
                 draw_bg(0, ppu.beam_y - 1, BPP_8, 4, 10);
                 draw_bg(1, ppu.beam_y - 1, BPP_4, 1, 7);
             }
-            if(ppu.bg_mode == 4) {
+            if (ppu.bg_mode == 4) {
                 draw_bg(0, ppu.beam_y - 1, BPP_8, 4, 10);
                 draw_bg(1, ppu.beam_y - 1, BPP_2, 1, 7);
             }

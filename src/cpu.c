@@ -352,6 +352,18 @@ void cpu_reset(void) {
     cpu.pc = read_16(0xfffc, 0);
     cpu.emulation_mode = true;
     cpu.p = 0b110000;
+    for (uint8_t i = 0; i < 8; i++) {
+        cpu.memory.dmas[i].transfer_pattern = 7;
+        cpu.memory.dmas[i].addr_inc_mode = 3;
+        cpu.memory.dmas[i].indirect_hdma = true;
+        cpu.memory.dmas[i].direction = true;
+        cpu.memory.dmas[i].b_bus_addr = 0xff;
+        cpu.memory.dmas[i].dma_src_addr = 0xffffff;
+        cpu.memory.dmas[i].dma_byte_count = 0xffffff;
+        cpu.memory.dmas[i].hdma_current_address = 0xffff;
+        cpu.memory.dmas[i].scanlines_left = 127;
+        cpu.memory.dmas[i].hdma_repeat = true;
+    }
 }
 
 static uint8_t cpu_cycle_counts[] = {

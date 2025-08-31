@@ -58,6 +58,11 @@ void cpu_window(void) {
     if (ImGui::Button("Step"))
         cpu.state = STATE_CPU_STEPPED;
     ImGui::SameLine();
+    if(ImGui::Button("Run Frame")) {
+        cpu.state = STATE_RUNNING;
+        cpu.break_next_frame = true;
+    }
+    ImGui::SameLine();
     if (ImGui::Button("Dump State")) {
         for (uint16_t i = cpu.history_idx; i != cpu.history_idx - 1; i++) {
             printf("0x%06x: 0x%02x\t 0x%04x: 0x%02x\n", cpu.pc_history[i],

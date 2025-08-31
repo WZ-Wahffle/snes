@@ -106,13 +106,106 @@ uint8_t mmu_read(uint16_t addr, uint8_t bank, bool log) {
                 return (ppu.mul_factor_1 * ppu.mul_factor_2) >> 8;
             case 0x2136:
                 return (ppu.mul_factor_1 * ppu.mul_factor_2) >> 16;
+            case 0x2137:
+                if (!ppu.counter_latch) {
+                    ppu.beam_x_latch_content = ppu.beam_x;
+                    ppu.beam_y_latch_content = ppu.beam_y;
+                }
+                ppu.counter_latch = true;
+                return 0;
+            case 0x2138: {
+                if (ppu.oam_addr < 512) {
+                    uint8_t oam_idx = ppu.oam_addr / 4;
+                    uint8_t ret = 0;
+                    switch (ppu.oam_addr % 4) {
+                    case 0:
+                        ret = ppu.oam[oam_idx].x & 0xff;
+                        break;
+                    case 1:
+                        ret = ppu.oam[oam_idx].y;
+                        break;
+                    case 2:
+                        ret = ppu.oam[oam_idx].tile_idx;
+                        break;
+                    case 3:
+                        ret = ppu.oam[oam_idx].use_second_sprite_page |
+                              (ppu.oam[oam_idx].palette << 1) |
+                              (ppu.oam[oam_idx].priority << 4) |
+                              (ppu.oam[oam_idx].flip_h << 6) |
+                              (ppu.oam[oam_idx].flip_v << 7);
+                        break;
+                    }
+                    ppu.oam_addr += 1;
+                    return ret;
+                } else {
+                    uint8_t idx = ppu.oam_addr - 512;
+                    uint8_t ret = 0;
+                    ret = ((ppu.oam[idx * 4].x >> 8) << 0) |
+                          ((ppu.oam[idx * 4].use_second_size) << 1) |
+                          ((ppu.oam[idx * 4 + 1].x >> 8) << 2) |
+                          ((ppu.oam[idx * 4 + 1].use_second_size) << 3) |
+                          ((ppu.oam[idx * 4 + 2].x >> 8) << 4) |
+                          ((ppu.oam[idx * 4 + 2].use_second_size) << 5) |
+                          ((ppu.oam[idx * 4 + 3].x >> 8) << 6) |
+                          ((ppu.oam[idx * 4 + 3].use_second_size) << 7);
+                    ppu.oam_addr += 1;
+                    return ret;
+                }
+            }
+            case 0x2139:
+            case 0x213a: {
+                uint8_t ret =
+                    addr == 0x2139 ? ppu.vram_latch_l : ppu.vram_latch_h;
+                if (ppu.address_increment_mode == (addr - 0x2139)) {
+                    ppu.vram_latch_l = ppu.vram[ppu.vram_addr * 2];
+                    ppu.vram_latch_h = ppu.vram[ppu.vram_addr * 2 + 1];
+                    switch (ppu.address_increment_amount) {
+                    case 0:
+                        ppu.vram_addr++;
+                        break;
+                    case 1:
+                        ppu.vram_addr += 32;
+                        break;
+                    case 2:
+                    case 3:
+                        ppu.vram_addr += 128;
+                        break;
+                    default:
+                        UNREACHABLE_SWITCH(ppu.address_increment_amount);
+                    }
+                }
+                return ret;
+            };
+            case 0x213b: {
+                ppu.cgram_latched = !ppu.cgram_latched;
+                uint16_t col = r8g8b8a8_to_r5g5b5(ppu.cgram[ppu.cgram_addr++]);
+                return ppu.cgram_latched ? U16_LOBYTE(col) : U16_HIBYTE(col);
+            }
+            case 0x213c:
+                ppu.beam_x_latch = !ppu.beam_x_latch;
+                return ppu.beam_x_latch ? U16_LOBYTE(ppu.beam_x_latch_content)
+                                        : U16_HIBYTE(ppu.beam_x_latch_content);
+            case 0x213d:
+                ppu.beam_y_latch = !ppu.beam_y_latch;
+                return ppu.beam_y_latch ? U16_LOBYTE(ppu.beam_y_latch_content)
+                                        : U16_HIBYTE(ppu.beam_y_latch_content);
+            case 0x213e:
+                return 1;
             case 0x213f:
+                ppu.counter_latch = false;
+                ppu.beam_x_latch = false;
+                ppu.beam_y_latch = false;
                 return 3;
             case 0x2140:
             case 0x2141:
             case 0x2142:
             case 0x2143:
                 return spc.memory.ram[0xf4 + (addr - 0x2140)];
+            case 0x2180: {
+                uint8_t ret = cpu.memory.ram[cpu.memory.ramaddr++];
+                cpu.memory.ramaddr &= 0x1ffff;
+                return ret;
+            }
             case 0x4016: {
                 if (cpu.memory.joy_latch_pending) {
                     return (cpu.memory.joy1l & 0x8000) ? 0 : 1;
@@ -166,7 +259,7 @@ uint8_t mmu_read(uint16_t addr, uint8_t bank, bool log) {
                 return U16_HIBYTE(cpu.memory.dividend / cpu.memory.divisor);
             case 0x4216:
                 if (cpu.memory.doing_div) {
-                    if (cpu.memory.divisor)
+                    if (cpu.memory.divisor == 0)
                         return cpu.memory.dividend;
                     return U16_LOBYTE(cpu.memory.dividend % cpu.memory.divisor);
                 } else {
@@ -175,7 +268,7 @@ uint8_t mmu_read(uint16_t addr, uint8_t bank, bool log) {
                 }
             case 0x4217:
                 if (cpu.memory.doing_div) {
-                    if (cpu.memory.divisor)
+                    if (cpu.memory.divisor == 0)
                         return cpu.memory.dividend;
                     return U16_HIBYTE(cpu.memory.dividend % cpu.memory.divisor);
                 } else {
@@ -270,6 +363,39 @@ uint8_t mmu_read(uint16_t addr, uint8_t bank, bool log) {
             case 0x4377:
                 return cpu.memory.dmas[(addr - 0x4300) / 16].dma_byte_count >>
                        16;
+            case 0x4308:
+            case 0x4318:
+            case 0x4328:
+            case 0x4338:
+            case 0x4348:
+            case 0x4358:
+            case 0x4368:
+            case 0x4378:
+                return cpu.memory.dmas[(addr - 0x4300) / 16]
+                           .hdma_current_address &
+                       0xff;
+            case 0x4309:
+            case 0x4319:
+            case 0x4329:
+            case 0x4339:
+            case 0x4349:
+            case 0x4359:
+            case 0x4369:
+            case 0x4379:
+                return (cpu.memory.dmas[(addr - 0x4300) / 16]
+                            .hdma_current_address >>
+                        8) &
+                       0xff;
+            case 0x430a:
+            case 0x431a:
+            case 0x432a:
+            case 0x433a:
+            case 0x434a:
+            case 0x435a:
+            case 0x436a:
+            case 0x437a:
+                return cpu.memory.dmas[(addr - 0x4300) / 16].scanlines_left |
+                       (cpu.memory.dmas[(addr - 0x4300) / 16].hdma_repeat << 7);
             default:
                 log_message(LOG_LEVEL_WARNING,
                             "Tried to read from bank 0x%02x, address 0x%04x",
@@ -411,10 +537,14 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
             case 0x2116:
                 ppu.vram_addr &= 0xff00;
                 ppu.vram_addr |= value;
+                ppu.vram_latch_l = ppu.vram[ppu.vram_addr];
+                ppu.vram_latch_h = ppu.vram[ppu.vram_addr + 1];
                 break;
             case 0x2117:
                 ppu.vram_addr &= 0xff;
                 ppu.vram_addr |= value << 8;
+                ppu.vram_latch_l = ppu.vram[ppu.vram_addr];
+                ppu.vram_latch_h = ppu.vram[ppu.vram_addr + 1];
                 break;
             case 0x2118:
             case 0x2119: {
@@ -467,14 +597,16 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                 ppu.mode_7_tilemap_repeat = value & 128;
                 break;
             case 0x211b:
-                ppu.mul_factor_1 = (value << 8) | ppu.mode_7_latch;
+                ppu.a_7_buffer = (value << 8) | ppu.mode_7_latch;
                 ppu.mode_7_latch = value;
-                ppu.a_7 = ppu.mul_factor_1 / 256.f;
+                ppu.a_7 = ppu.a_7_buffer / 256.f;
+                ppu.mul_factor_1 = ppu.a_7_buffer;
                 break;
             case 0x211c:
-                ppu.mul_factor_2 = (value << 8) | ppu.mode_7_latch;
+                ppu.b_7_buffer = (value << 8) | ppu.mode_7_latch;
                 ppu.mode_7_latch = value;
-                ppu.b_7 = ppu.mul_factor_2 / 256.f;
+                ppu.b_7 = ppu.b_7_buffer / 256.f;
+                ppu.mul_factor_2 = value;
                 break;
             case 0x211d:
                 ppu.c_7_buffer = (value << 8) | ppu.mode_7_latch;
@@ -662,6 +794,15 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                 cpu.memory.joy_auto_read = value & 1;
                 cpu.vblank_nmi_enable = value & 0x80;
                 cpu.timer_irq = (value >> 4) & 0b11;
+                break;
+            case 0x4201:
+                if (value & 0x80) {
+                    if (!ppu.counter_latch) {
+                        ppu.beam_x_latch_content = ppu.beam_x;
+                        ppu.beam_y_latch_content = ppu.beam_y;
+                    }
+                    ppu.counter_latch = true;
+                }
                 break;
             case 0x4202:
                 cpu.memory.mul_factor_a = value;
