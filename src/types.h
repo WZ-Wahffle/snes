@@ -163,6 +163,8 @@ typedef struct {
     uint8_t coprocessor;
 
     struct dma_t {
+        uint8_t params_raw;
+
         bool hdma_enable;
         bool direction;
         bool indirect_hdma;

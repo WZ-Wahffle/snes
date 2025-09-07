@@ -74,7 +74,9 @@ static cart_hash_t rom_hash_lookup[] = {
     {"Control Test Auto", 0xdd642b6a, LOROM},
     {"Control Test Simple", 0xc0467d5c, LOROM},
     {"Donkey Kong Country", 0xc1a8ad4c, HIROM},
-    {"Aging Test ROM", 0x35a123c5, LOROM}
+    {"Aging Test ROM", 0x35a123c5, LOROM},
+    {"Burn In Test ROM", 0x660892f8, LOROM},
+    {"Harvest Moon", 0xe39158fd, LOROM}
 };
 
 void at_exit(void) {

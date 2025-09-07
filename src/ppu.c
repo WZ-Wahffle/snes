@@ -982,13 +982,12 @@ void ui(void) {
                 cpu.remaining_clocks += CYCLES_PER_DOT;
                 ppu.remaining_clocks += CYCLES_PER_DOT;
                 spc.remaining_clocks += CYCLES_PER_DOT;
-                while (cpu.remaining_clocks > 0 && cpu.state != STATE_STOPPED) {
+                while ((cpu.remaining_clocks > 0 || spc.remaining_clocks > 0) &&
+                       cpu.state != STATE_STOPPED) {
                     try_step_cpu();
-                }
-                while (spc.remaining_clocks > 0 && cpu.state != STATE_STOPPED) {
                     try_step_spc();
+                    try_step_ppu();
                 }
-                try_step_ppu();
                 break;
             }
         }
@@ -1015,6 +1014,13 @@ void ui(void) {
             (GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_Y) > 0.5) << 10;
         cpu.memory.joy1l |=
             (GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_Y) < -0.5) << 11;
+
+        cpu.memory.joy1l |= IsKeyDown(KEY_RIGHT) << 8;
+        cpu.memory.joy1l |= IsKeyDown(KEY_LEFT) << 9;
+        cpu.memory.joy1l |= IsKeyDown(KEY_DOWN) << 10;
+        cpu.memory.joy1l |= IsKeyDown(KEY_UP) << 11;
+        cpu.memory.joy1l |= IsKeyDown(KEY_RIGHT_CONTROL) << 12;
+        cpu.memory.joy1l |= IsKeyDown(KEY_LEFT_CONTROL) << 13;
         cpu.memory.joy_latch_pending = false;
 
         UpdateTexture(texture, framebuffer);

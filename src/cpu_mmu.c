@@ -107,10 +107,8 @@ uint8_t mmu_read(uint16_t addr, uint8_t bank, bool log) {
             case 0x2136:
                 return (ppu.mul_factor_1 * ppu.mul_factor_2) >> 16;
             case 0x2137:
-                if (!ppu.counter_latch) {
-                    ppu.beam_x_latch_content = ppu.beam_x;
-                    ppu.beam_y_latch_content = ppu.beam_y;
-                }
+                ppu.beam_x_latch_content = ppu.beam_x;
+                ppu.beam_y_latch_content = ppu.beam_y;
                 ppu.counter_latch = true;
                 return 0;
             case 0x2138: {
@@ -291,12 +289,7 @@ uint8_t mmu_read(uint16_t addr, uint8_t bank, bool log) {
             case 0x4350:
             case 0x4360:
             case 0x4370:
-                return (cpu.memory.dmas[(addr - 0x4300) / 16].direction << 7) |
-                       (cpu.memory.dmas[(addr - 0x4300) / 16].indirect_hdma
-                        << 6) |
-                       (cpu.memory.dmas[(addr - 0x4300) / 16].addr_inc_mode
-                        << 3) |
-                       cpu.memory.dmas[(addr - 0x4300) / 16].transfer_pattern;
+                return cpu.memory.dmas[(addr - 0x4300) / 16].params_raw;
             case 0x4301:
             case 0x4311:
             case 0x4321:
@@ -424,7 +417,7 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                 (bank >= 0xb0 && bank < 0xc0)) &&
                addr >= 0x6000 && addr < 0x8000) {
         if (cpu.memory.sram_size > 0) {
-            cpu.memory.sram[(addr - 0x6000) & cpu.memory.sram_size] = value;
+            cpu.memory.sram[(addr - 0x6000) % cpu.memory.sram_size] = value;
         }
     } else if ((bank < 0x40 || (bank >= 0x80 && bank < 0xc0)) &&
                addr < 0x8000) {
@@ -912,6 +905,7 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                     (value >> 3) & 0b11;
                 cpu.memory.dmas[(addr - 0x4300) / 16].transfer_pattern =
                     value & 0b111;
+                cpu.memory.dmas[(addr - 0x4300) / 16].params_raw = value;
                 break;
             case 0x4301:
             case 0x4311:
