@@ -530,18 +530,18 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
             case 0x2116:
                 ppu.vram_addr &= 0xff00;
                 ppu.vram_addr |= value;
-                ppu.vram_latch_l = ppu.vram[ppu.vram_addr];
-                ppu.vram_latch_h = ppu.vram[ppu.vram_addr + 1];
+                ppu.vram_latch_l = ppu.vram[ppu.vram_addr * 2];
+                ppu.vram_latch_h = ppu.vram[ppu.vram_addr * 2 + 1];
                 break;
             case 0x2117:
                 ppu.vram_addr &= 0xff;
                 ppu.vram_addr |= value << 8;
-                ppu.vram_latch_l = ppu.vram[ppu.vram_addr];
-                ppu.vram_latch_h = ppu.vram[ppu.vram_addr + 1];
+                ppu.vram_latch_l = ppu.vram[ppu.vram_addr * 2];
+                ppu.vram_latch_h = ppu.vram[ppu.vram_addr * 2 + 1];
                 break;
             case 0x2118:
             case 0x2119: {
-                uint16_t actual_addr = (ppu.vram_addr << 1) + (addr - 0x2118);
+                uint16_t actual_addr = ppu.vram_addr;
                 switch (ppu.address_remapping) {
                 case 0:
                     // this page intentionally left blank
@@ -564,6 +564,7 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                 default:
                     UNREACHABLE_SWITCH(ppu.address_remapping);
                 }
+                actual_addr = (actual_addr << 1) + (addr - 0x2118);
 
                 ppu.vram[actual_addr] = value;
                 if (ppu.address_increment_mode == (addr - 0x2118)) {
