@@ -643,6 +643,7 @@ void try_step_ppu(void) {
             ppu.beam_x = 0;
             ppu.beam_y++;
             if (ppu.beam_y == 262) {
+                ppu.interlace_field = !ppu.interlace_field;
                 ppu.beam_y = 0;
             }
         }
@@ -658,7 +659,11 @@ void try_step_ppu(void) {
             }
         }
 
-        if (ppu.beam_x == 0 && ppu.beam_y == 225) {
+        uint16_t vblank_start = 225;
+        if (ppu.overscan) {
+            vblank_start += 15;
+        }
+        if (ppu.beam_x == 0 && ppu.beam_y == vblank_start) {
             cpu.memory.vblank_has_occurred = true;
             if (cpu.break_next_frame && cpu.state == STATE_RUNNING) {
                 cpu.state = STATE_STOPPED;

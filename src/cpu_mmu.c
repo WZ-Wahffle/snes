@@ -193,7 +193,7 @@ uint8_t mmu_read(uint16_t addr, uint8_t bank, bool log) {
                 ppu.counter_latch = false;
                 ppu.beam_x_latch = false;
                 ppu.beam_y_latch = false;
-                return 3;
+                return 0b11 | (ppu.interlace_field << 7);
             case 0x2140:
             case 0x2141:
             case 0x2142:
@@ -744,7 +744,12 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                     ppu.fixed_color_r, ppu.fixed_color_g, ppu.fixed_color_b);
                 break;
             case 0x2133:
-                ppu.display_config = value;
+                ppu.screen_interlacing = value & 0b1;
+                ppu.obj_interlacing = value & 0b10;
+                ppu.overscan = value & 0b100;
+                ppu.high_res = value & 0b1000;
+                ppu.extbg = value & 0b1000000;
+                ppu.external_sync = value & 0b10000000;
                 break;
             case 0x2140:
             case 0x2141:

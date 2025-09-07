@@ -314,7 +314,8 @@ typedef struct {
     uint8_t mosaic_size;
     uint16_t h_timer_target, v_timer_target;
 
-    uint8_t display_config;
+    bool screen_interlacing, obj_interlacing, overscan, high_res, extbg, external_sync;
+    bool interlace_field;
     struct {
         bool large_characters;
         bool enable_mosaic;
