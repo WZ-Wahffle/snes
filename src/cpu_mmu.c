@@ -188,7 +188,8 @@ uint8_t mmu_read(uint16_t addr, uint8_t bank, bool log) {
                 return ppu.beam_y_latch ? U16_LOBYTE(ppu.beam_y_latch_content)
                                         : U16_HIBYTE(ppu.beam_y_latch_content);
             case 0x213e:
-                return 1;
+                return 0b1 | (ppu.oam_sprite_tile_overflow << 6) |
+                       (ppu.oam_sprite_overflow << 7);
             case 0x213f:
                 ppu.counter_latch = false;
                 ppu.beam_x_latch = false;

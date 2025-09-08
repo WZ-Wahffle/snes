@@ -382,6 +382,8 @@ typedef struct {
     uint16_t oam_addr;
     bool oam_priority_rotation;
     uint8_t oam_latch;
+    bool oam_sprite_overflow;
+    bool oam_sprite_tile_overflow;
     struct {
         int16_t x;
         int16_t y;

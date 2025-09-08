@@ -507,6 +507,7 @@ void draw_obj(uint16_t y) {
         {8, 8, 16, 16},   {8, 8, 32, 32},   {8, 8, 64, 64},   {16, 16, 32, 32},
         {16, 16, 64, 64}, {32, 32, 64, 64}, {16, 32, 32, 64}, {16, 32, 32, 32}};
     uint8_t draw_count = 0;
+    uint8_t sliver_count = 0;
     if (ppu.enable_obj_override)
         return;
 
@@ -519,9 +520,23 @@ void draw_obj(uint16_t y) {
         uint8_t sp_h =
             size_lut[ppu.obj_sprite_size][ppu.oam[i].use_second_size * 2 + 1];
         ppu.oam[i].draw_this_line = IN_INTERVAL(y, sp_y, sp_y + sp_h) &&
-                                    IN_INTERVAL(sp_x, 0, WINDOW_WIDTH - sp_w) &&
-                                    draw_count++ < 32;
+                                    IN_INTERVAL(sp_x, 0, WINDOW_WIDTH - sp_w);
+        if (ppu.oam[i].draw_this_line) {
+            draw_count++;
+            sliver_count += sp_w / 8;
+        }
+        if(draw_count > 32 || sliver_count > 34) ppu.oam[i].draw_this_line = false;
     }
+    // This really doesn't make much sense.
+    // The (scarce) documentation around these two flags from STAT77
+    // state that the former triggers at a sprite count GREATER THAN 32,
+    // yet both the Aging Test ROM and SNES9X seem to assume
+    // GREATER OR EQUAL TO 32.
+    // Also, the latter is meant to be GREATER THAN 34 but actually seems
+    // to function only with GREATER THAN 32, also in accordance with
+    // SNES9X and the Aging ROM.
+    ppu.oam_sprite_tile_overflow |= draw_count >= 32;
+    ppu.oam_sprite_overflow |= sliver_count > 32;
 
     uint16_t name_base = ppu.obj_name_base_address << 14;
     uint16_t name_alt = name_base + ((ppu.obj_name_select + 1) << 13);
@@ -645,6 +660,8 @@ void try_step_ppu(void) {
             if (ppu.beam_y == 262) {
                 ppu.interlace_field = !ppu.interlace_field;
                 ppu.beam_y = 0;
+                ppu.oam_sprite_overflow = false;
+                ppu.oam_sprite_tile_overflow = false;
             }
         }
 
