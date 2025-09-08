@@ -1052,7 +1052,8 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
             addr, bank);
         cpu.memory.ram[(bank - 0x7e) * 0x10000 + addr] = value;
     } else {
-        ASSERT(0, "Tried to write 0x%02x to bank 0x%02x, address 0x%04x", value,
-               bank, addr);
+        log_message(LOG_LEVEL_WARNING,
+                    "Tried to write 0x%02x to bank 0x%02x, address 0x%04x",
+                    value, bank, addr);
     }
 }
