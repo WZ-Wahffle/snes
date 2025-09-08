@@ -289,8 +289,8 @@ typedef struct {
     uint8_t a, x, y, s, p;
     uint16_t pc;
     double remaining_clocks;
-    bool breakpoint_valid;
-    uint16_t breakpoint;
+    breakpoint_t *breakpoints;
+    uint32_t breakpoints_size;
     bool enable_ipl;
     bool brk;
 

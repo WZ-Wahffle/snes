@@ -97,8 +97,12 @@ void try_step_cpu(void) {
 void try_step_spc(void) {
     if (spc.remaining_clocks > 0) {
         spc_execute();
-        if (spc.breakpoint_valid && spc.pc == spc.breakpoint) {
-            cpu.state = STATE_STOPPED;
+        for (uint32_t i = 0; i < spc.breakpoints_size; i++) {
+            if (spc.breakpoints[i].valid && spc.breakpoints[i].execute &&
+                spc.pc == spc.breakpoints[i].line) {
+                cpu.state = STATE_STOPPED;
+                break;
+            }
         }
         if (spc.brk) {
             spc.brk = false;
@@ -525,7 +529,8 @@ void draw_obj(uint16_t y) {
             draw_count++;
             sliver_count += sp_w / 8;
         }
-        if(draw_count > 32 || sliver_count > 34) ppu.oam[i].draw_this_line = false;
+        if (draw_count > 32 || sliver_count > 34)
+            ppu.oam[i].draw_this_line = false;
     }
     // This really doesn't make much sense.
     // The (scarce) documentation around these two flags from STAT77

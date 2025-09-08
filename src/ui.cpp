@@ -58,7 +58,7 @@ void cpu_window(void) {
     if (ImGui::Button("Step"))
         cpu.state = STATE_CPU_STEPPED;
     ImGui::SameLine();
-    if(ImGui::Button("Run Frame")) {
+    if (ImGui::Button("Run Frame")) {
         cpu.state = STATE_RUNNING;
         cpu.break_next_frame = true;
     }
@@ -66,7 +66,8 @@ void cpu_window(void) {
     if (ImGui::Button("Dump State")) {
         for (uint16_t i = cpu.history_idx; i != cpu.history_idx - 1; i++) {
             printf("0x%06x: 0x%02x\t 0x%04x: 0x%02x\n", cpu.pc_history[i],
-                   cpu.opcode_history[i], spc.pc_history[i], spc.opcode_history[i]);
+                   cpu.opcode_history[i], spc.pc_history[i],
+                   spc.opcode_history[i]);
         }
     }
     ImGui::Text("Speed: %.4lfx", cpu.speed);
@@ -338,7 +339,7 @@ void dma_window(void) {
     ImGui::End();
 }
 
-char spc_bp_inter[5] = {0};
+std::vector<breakpoint_t> spc_bp;
 void spc_window(void) {
     ImGui::Begin("spc", NULL, ImGuiWindowFlags_HorizontalScrollbar);
     if (ImGui::Button("Start"))
@@ -355,24 +356,69 @@ void spc_window(void) {
     ImGui::Text("Y: 0x%02x", spc.y);
     ImGui::Text("SP: 0x%02x", spc.s);
     ImGui::Text("P: 0x%02x", spc.p);
-    ImGui::Text("Breakpoint: 0x");
-    ImGui::SameLine();
-    ImGui::PushItemWidth(4 * ImGui::GetFontSize());
-    ImGui::InputText("##spcbpin", spc_bp_inter, 5);
-    ImGui::PopItemWidth();
-    spc.breakpoint_valid = true;
-    for (char &c : spc_bp_inter) {
-        if ((c < '0' || c > '9') && (c < 'a' || c > 'f') &&
-            (c < 'A' || c > 'F'))
-            spc.breakpoint_valid = false;
-        break;
+    ImGui::Text("CPU Bus Tx: 0x%02x 0x%02x 0x%02x 0x%02x",
+                spc.memory.ram[0xf4], spc.memory.ram[0xf5],
+                spc.memory.ram[0xf6], spc.memory.ram[0xf7]);
+    ImGui::Text("CPU Bus Rx: 0x%02x 0x%02x 0x%02x 0x%02x",
+                cpu.memory.apu_io[0], cpu.memory.apu_io[1],
+                cpu.memory.apu_io[2], cpu.memory.apu_io[3]);
+    ImGui::NewLine();
+
+    if (ImGui::Button("+##spcbpadd")) {
+        spc_bp.push_back(breakpoint_t{0, {0}, 0, 0, 0, 0});
+        spc.breakpoints = spc_bp.data();
+        spc.breakpoints_size = spc_bp.size();
     }
-    if (!spc.breakpoint_valid) {
+    bool remove = false;
+    uint32_t to_remove = 0;
+    for (uint32_t i = 0; i < spc_bp.size(); i++) {
+        ImGui::Text("0x");
         ImGui::SameLine();
-        ImGui::TextColored(ImVec4{0xff, 0, 0, 0xff}, "Invalid!");
-    } else {
-        spc.breakpoint = strtoul(spc_bp_inter, NULL, 16);
+        ImGui::PushItemWidth(4 * ImGui::GetFontSize());
+        ImGui::InputText((std::string("##spcbpin") + std::to_string(i)).c_str(),
+                         spc_bp[i].bp_inter, 7);
+        ImGui::PopItemWidth();
+        spc_bp[i].valid = true;
+        for (char &c : spc_bp[i].bp_inter) {
+            if ((c < '0' || c > '9') && (c < 'a' || c > 'f') &&
+                (c < 'A' || c > 'F'))
+                spc_bp[i].valid = false;
+            break;
+        }
+        if (!spc_bp[i].valid) {
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4{0xff, 0, 0, 0xff}, "Invalid!");
+            ImGui::SameLine();
+        } else {
+            spc_bp[i].line = strtoul(spc_bp[i].bp_inter, NULL, 16);
+            ImGui::SameLine();
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() +
+                                 ImGui::CalcTextSize(" Invalid!").x);
+        }
+        ImGui::Checkbox((std::string("R##spcbpr") + std::to_string(i)).c_str(),
+                        &spc_bp[i].read);
+        ImGui::SameLine();
+        ImGui::Checkbox((std::string("W##spcbpw") + std::to_string(i)).c_str(),
+                        &spc_bp[i].write);
+        ImGui::SameLine();
+        ImGui::Checkbox((std::string("X##spcbpx") + std::to_string(i)).c_str(),
+                        &spc_bp[i].execute);
+        ImGui::SameLine();
+        if (ImGui::Button(
+                (std::string("-##spcbprm") + std::to_string(i)).c_str())) {
+            remove = true;
+            to_remove = i;
+        }
     }
+
+    if (remove) {
+        spc_bp.erase(spc_bp.begin() + to_remove);
+        spc.breakpoints = spc_bp.data();
+        spc.breakpoints_size = spc_bp.size();
+    }
+
+    ImGui::NewLine();
+
     ImGui::Text("Timer 0 enable: %s",
                 spc.memory.timers[0].enable ? "true" : "false");
     ImGui::Text("Timer 0 timer: %d", spc.memory.timers[0].timer_internal);
