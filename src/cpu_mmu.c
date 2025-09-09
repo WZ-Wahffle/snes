@@ -589,7 +589,7 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                 ppu.mode_7_flip_h = value & 1;
                 ppu.mode_7_flip_v = value & 2;
                 ppu.mode_7_non_tilemap_fill = value & 64;
-                ppu.mode_7_tilemap_repeat = value & 128;
+                ppu.mode_7_tilemap_repeat = !(value & 128);
                 break;
             case 0x211b:
                 ppu.a_7_buffer = (value << 8) | ppu.mode_7_latch;

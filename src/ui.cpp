@@ -156,6 +156,7 @@ void ppu_window(void) {
     ImGui::Begin("ppu", NULL, ImGuiWindowFlags_HorizontalScrollbar);
     ImGui::Text("BG Mode: %d", ppu.bg_mode);
     ImGui::Text("Brightness: %f", ppu.brightness / 15.f);
+    ImGui::Text("Fixed Color: 0x%08x", ppu.fixed_color_24bit);
     ImGui::Text("VRAM Address: 0x%04x", ppu.vram_addr);
     ImGui::Text("VRAM Address Remapping Index: %d", ppu.address_remapping);
     ImGui::Text("VRAM Address Increment Amount Index: %d",
@@ -178,6 +179,8 @@ void ppu_window(void) {
         ImGui::Text("M7 down -> right: %f", ppu.b_7);
         ImGui::Text("M7 right -> down: %f", ppu.c_7);
         ImGui::Text("M7 down -> down: %f", ppu.d_7);
+        ImGui::Text("M7 Tilemap Repeat: %s", ppu.mode_7_tilemap_repeat ? "true" : "false");
+        ImGui::Text("M7 Non-Tilemap Fill: %s", ppu.mode_7_non_tilemap_fill ? "Char 0" : "Transparent");
     }
     ImGui::End();
 }

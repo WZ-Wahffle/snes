@@ -501,8 +501,10 @@ void draw_bg_1_mode_7(int16_t y) {
         uint16_t tile_idx = ppu.vram[tile_number * 2];
         uint8_t palette_idx =
             ppu.vram[tile_idx * 128 + (2 * (x % 8)) + (2 * (y % 8) * 8) + 1];
-        target[screen_x] = ppu.cgram[palette_idx];
-        target_sub[screen_x] = ppu.cgram[palette_idx];
+        if (ppu.bg_config[0].main_screen_enable)
+            target[screen_x] = ppu.cgram[palette_idx];
+        if (ppu.bg_config[0].sub_screen_enable)
+            target_sub[screen_x] = ppu.cgram[palette_idx];
     }
 }
 
