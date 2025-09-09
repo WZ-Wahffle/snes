@@ -169,6 +169,10 @@ void ppu_window(void) {
     ImGui::Text("Timer Target Mode: %d", cpu.timer_irq);
     ImGui::Text("BG Mode 1 BG3 elevate: %s",
                 ppu.mode_1_bg3_prio ? "true" : "false");
+    ImGui::Text("Color Math Color Source: %s", ppu.addend_subscreen ? "Subscreen" : "Fixed Color");
+    std::string region_types[] = {"Nowhere", "Outside Window", "Inside Window", "Everywhere"};
+    ImGui::Text("Color Math Main Black: %s", region_types[ppu.main_window_black_region].c_str());
+    ImGui::Text("Color Math Sub Transparent: %s", region_types[ppu.sub_window_transparent_region].c_str());
     if (ppu.bg_mode == 7) {
         ImGui::Text("M7 right -> right: %f", ppu.a_7);
         ImGui::Text("M7 down -> right: %f", ppu.b_7);
@@ -220,6 +224,7 @@ void bg_window(void) {
     ImGui::Text("Window 2 %sabled%s",
                 ppu.bg_config[bg_selected].window_2_enable ? "en" : "dis",
                 ppu.bg_config[bg_selected].window_2_invert ? ", inverted" : "");
+    ImGui::Text("Color Math %sabled", ppu.bg_config[bg_selected].color_math_enable ? "en" : "dis");
     ImGui::End();
 }
 

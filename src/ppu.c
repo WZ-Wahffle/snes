@@ -830,7 +830,7 @@ void try_step_ppu(void) {
             }
             draw_obj(ppu.beam_y - 1);
             for (uint16_t i = 0; i < WINDOW_WIDTH; i++) {
-                if (false) {
+                if (use_color_math[i]) {
                     bool window_1 = false;
                     if (ppu.col_window_1_enable) {
                         window_1 =
@@ -927,14 +927,14 @@ void try_step_ppu(void) {
                             : ppu.fixed_color_24bit;
                     int32_t r, g, b;
                     if (ppu.color_math_subtract) {
-                        r = ((main >> 3) & 0xff) - ((to_add >> 3) & 0xff);
-                        g = ((main >> 11) & 0xff) - ((to_add >> 11) & 0xff);
-                        b = ((main >> 19) & 0xff) - ((to_add >> 19) & 0xff);
+                        r = (main & 0xff) - (to_add & 0xff);
+                        g = ((main >> 8) & 0xff) - ((to_add >> 8) & 0xff);
+                        b = ((main >> 16) & 0xff) - ((to_add >> 16) & 0xff);
 
                     } else {
-                        r = ((main >> 3) & 0xff) + ((to_add >> 3) & 0xff);
-                        g = ((main >> 11) & 0xff) + ((to_add >> 11) & 0xff);
-                        b = ((main >> 19) & 0xff) + ((to_add >> 19) & 0xff);
+                        r = (main & 0xff) + (to_add & 0xff);
+                        g = ((main >> 8) & 0xff) + ((to_add >> 8) & 0xff);
+                        b = ((main >> 16) & 0xff) + ((to_add >> 16) & 0xff);
                     }
                     if (ppu.half_color_math) {
                         r /= 2;
@@ -1013,8 +1013,8 @@ void ui(void) {
                        cpu.state != STATE_STOPPED) {
                     try_step_cpu();
                     try_step_spc();
-                    try_step_ppu();
                 }
+                try_step_ppu();
                 break;
             }
         }
