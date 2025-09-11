@@ -60,6 +60,11 @@ void cpu_window(void) {
     if (ImGui::Button("Step"))
         cpu.state = STATE_CPU_STEPPED;
     ImGui::SameLine();
+    if(ImGui::Button("Run Scanline")) {
+        cpu.state = STATE_RUNNING;
+        cpu.break_next_scanline = true;
+    }
+    ImGui::SameLine();
     if (ImGui::Button("Run Frame")) {
         cpu.state = STATE_RUNNING;
         cpu.break_next_frame = true;

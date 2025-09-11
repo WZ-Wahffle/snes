@@ -209,7 +209,7 @@ typedef struct {
 
     emu_state_t state;
     double speed;
-    bool break_next_frame;
+    bool break_next_frame, break_next_scanline;
 
     breakpoint_t *breakpoints;
     uint32_t breakpoints_size;

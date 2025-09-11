@@ -669,11 +669,19 @@ void try_step_ppu(void) {
         if (ppu.beam_x == 340) {
             ppu.beam_x = 0;
             ppu.beam_y++;
+            if(cpu.state == STATE_RUNNING && cpu.break_next_scanline) {
+                cpu.state = STATE_STOPPED;
+                cpu.break_next_scanline = false;
+            }
             if (ppu.beam_y == 262) {
                 ppu.interlace_field = !ppu.interlace_field;
                 ppu.beam_y = 0;
                 ppu.oam_sprite_overflow = false;
                 ppu.oam_sprite_tile_overflow = false;
+                if(cpu.state == STATE_RUNNING && cpu.break_next_frame) {
+                    cpu.state = STATE_STOPPED;
+                    cpu.break_next_frame = false;
+                }
             }
         }
 
@@ -694,10 +702,6 @@ void try_step_ppu(void) {
         }
         if (ppu.beam_x == 0 && ppu.beam_y == vblank_start) {
             cpu.memory.vblank_has_occurred = true;
-            if (cpu.break_next_frame && cpu.state == STATE_RUNNING) {
-                cpu.state = STATE_STOPPED;
-                cpu.break_next_frame = false;
-            }
         }
         if (ppu.beam_x == 339 && ppu.beam_y == 261) {
             cpu.memory.vblank_has_occurred = false;
@@ -989,7 +993,7 @@ void ui(void) {
     Texture texture = LoadTextureFromImage(framebuffer_image);
     cpp_init();
 
-    bool view_debug_ui = false;
+    bool view_debug_ui = false, view_scanline = false;
 
     ppu.v_timer_target = 0x1ff;
     ppu.h_timer_target = 0x1ff;
@@ -1081,7 +1085,6 @@ void ui(void) {
         }
 
         if (IsKeyPressed(KEY_F10)) {
-
             cpu.state =
                 cpu.state == STATE_RUNNING ? STATE_STOPPED : STATE_RUNNING;
         }
@@ -1092,6 +1095,17 @@ void ui(void) {
 
         if (IsKeyPressed(KEY_HOME)) {
             cpu.speed /= 2;
+        }
+
+        if(IsKeyPressed(KEY_LEFT_ALT)) {
+            view_scanline = !view_scanline;
+        }
+
+        if(view_scanline) {
+            uint32_t scanline_pos = ((ppu.beam_y - 1.f) / WINDOW_HEIGHT) * GetScreenHeight();
+            DrawLine(0, scanline_pos-1, GetScreenWidth(), scanline_pos-1, WHITE);
+            DrawLine(0, scanline_pos, GetScreenWidth(), scanline_pos, RED);
+            DrawLine(0, scanline_pos+1, GetScreenWidth(), scanline_pos+1, WHITE);
         }
 
         if (view_debug_ui) {
