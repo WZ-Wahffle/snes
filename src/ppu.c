@@ -694,8 +694,15 @@ void try_step_ppu(void) {
                 cpu.break_next_frame = false;
             }
         }
-        if (ppu.beam_x == 339 && ppu.beam_y == 261)
+        if (ppu.beam_x == 339 && ppu.beam_y == 261) {
             cpu.memory.vblank_has_occurred = false;
+            for (uint8_t i = 0; i < 8; i++) {
+                if (cpu.memory.dmas[i].hdma_enable) {
+                    cpu.memory.dmas[i].hdma_current_address =
+                        cpu.memory.dmas[i].dma_src_addr;
+                }
+            }
+        }
 
         if (ppu.beam_x == 278 && ppu.beam_y > 0 && ppu.beam_y < 225) {
             for (uint8_t i = 0; i < 8; i++) {
@@ -826,6 +833,13 @@ void try_step_ppu(void) {
             if (ppu.bg_mode == 4) {
                 draw_bg(0, ppu.beam_y - 1, BPP_8, 4, 10);
                 draw_bg(1, ppu.beam_y - 1, BPP_2, 1, 7);
+            }
+            if (ppu.bg_mode == 5) {
+                draw_bg(0, ppu.beam_y - 1, BPP_4, 4, 10);
+                draw_bg(1, ppu.beam_y - 1, BPP_2, 1, 7);
+            }
+            if (ppu.bg_mode == 6) {
+                draw_bg(0, ppu.beam_y - 1, BPP_4, 4, 10);
             }
             if (ppu.bg_mode == 7) {
                 draw_bg_1_mode_7(ppu.beam_y - 1);

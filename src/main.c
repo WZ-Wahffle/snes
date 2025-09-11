@@ -76,7 +76,8 @@ static cart_hash_t rom_hash_lookup[] = {
     {"Donkey Kong Country", 0xc1a8ad4c, HIROM},
     {"Aging Test ROM", 0x35a123c5, LOROM},
     {"Burn In Test ROM", 0x660892f8, LOROM},
-    {"Harvest Moon", 0xe39158fd, LOROM}
+    {"Harvest Moon", 0xe39158fd, LOROM},
+    {"The Legend Of Zelda: A Link To The Past", 0x5c289c1c, LOROM}
 };
 
 void at_exit(void) {

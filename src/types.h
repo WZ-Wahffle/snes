@@ -24,12 +24,12 @@ static void log_message(log_level_t level, char *message, ...);
 #define ASSERT(val, msg, ...)                                                  \
     do {                                                                       \
         if (!(val)) {                                                          \
-            log_message(LOG_LEVEL_ERROR, "%s:%d: Assertion failed:", __FILE__, \
+            log_message(LOG_LEVEL_ERROR, (char*)"%s:%d: Assertion failed:", __FILE__, \
                         __LINE__);                                             \
             log_message(LOG_LEVEL_ERROR, msg, __VA_ARGS__);                    \
-            log_message(LOG_LEVEL_ERROR, "CPU PC: 0x%04x, bank: 0x%02x",       \
+            log_message(LOG_LEVEL_ERROR, (char*)"CPU PC: 0x%04x, bank: 0x%02x",       \
                         cpu.pc, cpu.pbr);                                      \
-            log_message(LOG_LEVEL_ERROR, "SPC PC: 0x%04x", spc.pc);            \
+            log_message(LOG_LEVEL_ERROR, (char*)"SPC PC: 0x%04x", spc.pc);            \
             exit(1);                                                           \
         }                                                                      \
     } while (0)
@@ -314,7 +314,8 @@ typedef struct {
     uint8_t mosaic_size;
     uint16_t h_timer_target, v_timer_target;
 
-    bool screen_interlacing, obj_interlacing, overscan, high_res, extbg, external_sync;
+    bool screen_interlacing, obj_interlacing, overscan, high_res, extbg,
+        external_sync;
     bool interlace_field;
     struct {
         bool large_characters;

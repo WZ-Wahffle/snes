@@ -40,6 +40,8 @@ void cpu_window(void) {
             if (cpu.memory.sram_size == sram_size) {
                 f.read(reinterpret_cast<char *>(cpu.memory.sram),
                        cpu.memory.sram_size);
+            } else {
+                ASSERT(0, (char*)"Expected SRAM size %d, found %d", cpu.memory.sram_size, sram_size);
             }
             f.close();
             confirm_load = false;
@@ -165,22 +167,29 @@ void ppu_window(void) {
     ImGui::Text("Window 2: %d-%d", ppu.window_2_l, ppu.window_2_r);
     ImGui::Text("Beam X: %d", ppu.beam_x);
     ImGui::Text("Beam Y: %d", ppu.beam_y);
+    ImGui::Text("Overscan: %s", ppu.overscan ? "true" : "false");
     ImGui::Text("H Timer Target: %d", ppu.h_timer_target);
     ImGui::Text("V Timer Target: %d", ppu.v_timer_target);
     ImGui::Text("Timer Target Mode: %d", cpu.timer_irq);
     ImGui::Text("BG Mode 1 BG3 elevate: %s",
                 ppu.mode_1_bg3_prio ? "true" : "false");
-    ImGui::Text("Color Math Color Source: %s", ppu.addend_subscreen ? "Subscreen" : "Fixed Color");
-    std::string region_types[] = {"Nowhere", "Outside Window", "Inside Window", "Everywhere"};
-    ImGui::Text("Color Math Main Black: %s", region_types[ppu.main_window_black_region].c_str());
-    ImGui::Text("Color Math Sub Transparent: %s", region_types[ppu.sub_window_transparent_region].c_str());
+    ImGui::Text("Color Math Color Source: %s",
+                ppu.addend_subscreen ? "Subscreen" : "Fixed Color");
+    std::string region_types[] = {"Nowhere", "Outside Window", "Inside Window",
+                                  "Everywhere"};
+    ImGui::Text("Color Math Main Black: %s",
+                region_types[ppu.main_window_black_region].c_str());
+    ImGui::Text("Color Math Sub Transparent: %s",
+                region_types[ppu.sub_window_transparent_region].c_str());
     if (ppu.bg_mode == 7) {
         ImGui::Text("M7 right -> right: %f", ppu.a_7);
         ImGui::Text("M7 down -> right: %f", ppu.b_7);
         ImGui::Text("M7 right -> down: %f", ppu.c_7);
         ImGui::Text("M7 down -> down: %f", ppu.d_7);
-        ImGui::Text("M7 Tilemap Repeat: %s", ppu.mode_7_tilemap_repeat ? "true" : "false");
-        ImGui::Text("M7 Non-Tilemap Fill: %s", ppu.mode_7_non_tilemap_fill ? "Char 0" : "Transparent");
+        ImGui::Text("M7 Tilemap Repeat: %s",
+                    ppu.mode_7_tilemap_repeat ? "true" : "false");
+        ImGui::Text("M7 Non-Tilemap Fill: %s",
+                    ppu.mode_7_non_tilemap_fill ? "Char 0" : "Transparent");
     }
     ImGui::End();
 }
@@ -227,7 +236,8 @@ void bg_window(void) {
     ImGui::Text("Window 2 %sabled%s",
                 ppu.bg_config[bg_selected].window_2_enable ? "en" : "dis",
                 ppu.bg_config[bg_selected].window_2_invert ? ", inverted" : "");
-    ImGui::Text("Color Math %sabled", ppu.bg_config[bg_selected].color_math_enable ? "en" : "dis");
+    ImGui::Text("Color Math %sabled",
+                ppu.bg_config[bg_selected].color_math_enable ? "en" : "dis");
     ImGui::End();
 }
 
@@ -332,18 +342,28 @@ void dma_window(void) {
                 cpu.memory.dmas[dma_selected].hdma_enable ? "true" : "false");
     ImGui::Text("Direction: %s",
                 cpu.memory.dmas[dma_selected].direction ? "B -> A" : "A -> B");
-    ImGui::Text("Indirect: %s",
-                cpu.memory.dmas[dma_selected].indirect_hdma ? "true" : "false");
-    ImGui::Text("Address adjust mode: %d",
-                cpu.memory.dmas[dma_selected].addr_inc_mode);
     ImGui::Text("Transfer pattern: %d",
                 cpu.memory.dmas[dma_selected].transfer_pattern);
+    if (cpu.memory.dmas[dma_selected].hdma_enable) {
+        ImGui::Text("HDMA Indirect: %s",
+                    cpu.memory.dmas[dma_selected].indirect_hdma ? "true"
+                                                                : "false");
+        ImGui::Text("HDMA Scanlines Left: %d",
+                    cpu.memory.dmas[dma_selected].scanlines_left);
+        ImGui::Text("HDMA Repeat: %s",
+                    cpu.memory.dmas[dma_selected].hdma_repeat ? "yes" : "no");
+        ImGui::Text("HDMA Table Start Address: 0x%06x",
+                    cpu.memory.dmas[dma_selected].dma_src_addr);
+    } else {
+        ImGui::Text("DMA Address adjust mode: %d",
+                    cpu.memory.dmas[dma_selected].addr_inc_mode);
+        ImGui::Text("DMA Byte Count: 0x%04x",
+                    cpu.memory.dmas[dma_selected].dma_byte_count);
+        ImGui::Text("DMA A Address: 0x%06x",
+                    cpu.memory.dmas[dma_selected].dma_src_addr);
+    }
     ImGui::Text("B Address: 0x%04x",
                 0x2100 + cpu.memory.dmas[dma_selected].b_bus_addr);
-    ImGui::Text("A Address: 0x%06x",
-                cpu.memory.dmas[dma_selected].dma_src_addr);
-    ImGui::Text("Byte Count: 0x%04x",
-                cpu.memory.dmas[dma_selected].dma_byte_count);
     ImGui::End();
 }
 
@@ -364,12 +384,12 @@ void spc_window(void) {
     ImGui::Text("Y: 0x%02x", spc.y);
     ImGui::Text("SP: 0x%02x", spc.s);
     ImGui::Text("P: 0x%02x", spc.p);
-    ImGui::Text("CPU Bus Tx: 0x%02x 0x%02x 0x%02x 0x%02x",
-                spc.memory.ram[0xf4], spc.memory.ram[0xf5],
-                spc.memory.ram[0xf6], spc.memory.ram[0xf7]);
-    ImGui::Text("CPU Bus Rx: 0x%02x 0x%02x 0x%02x 0x%02x",
-                cpu.memory.apu_io[0], cpu.memory.apu_io[1],
-                cpu.memory.apu_io[2], cpu.memory.apu_io[3]);
+    ImGui::Text("CPU Bus Tx: 0x%02x 0x%02x 0x%02x 0x%02x", spc.memory.ram[0xf4],
+                spc.memory.ram[0xf5], spc.memory.ram[0xf6],
+                spc.memory.ram[0xf7]);
+    ImGui::Text("CPU Bus Rx: 0x%02x 0x%02x 0x%02x 0x%02x", cpu.memory.apu_io[0],
+                cpu.memory.apu_io[1], cpu.memory.apu_io[2],
+                cpu.memory.apu_io[3]);
     ImGui::NewLine();
 
     if (ImGui::Button("+##spcbpadd")) {
