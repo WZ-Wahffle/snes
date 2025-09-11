@@ -166,6 +166,7 @@ typedef struct {
         uint8_t params_raw;
 
         bool hdma_enable;
+        bool hdma_stopped;
         bool direction;
         bool indirect_hdma;
         uint8_t addr_inc_mode;
@@ -178,6 +179,7 @@ typedef struct {
         bool hdma_repeat;
         uint8_t scanlines_left;
     } dmas[8];
+    uint8_t dmas_for_reloading[128];
 
     uint8_t apu_io[4];
     bool vblank_has_occurred;

@@ -669,7 +669,7 @@ void try_step_ppu(void) {
         if (ppu.beam_x == 340) {
             ppu.beam_x = 0;
             ppu.beam_y++;
-            if(cpu.state == STATE_RUNNING && cpu.break_next_scanline) {
+            if (cpu.state == STATE_RUNNING && cpu.break_next_scanline) {
                 cpu.state = STATE_STOPPED;
                 cpu.break_next_scanline = false;
             }
@@ -678,7 +678,7 @@ void try_step_ppu(void) {
                 ppu.beam_y = 0;
                 ppu.oam_sprite_overflow = false;
                 ppu.oam_sprite_tile_overflow = false;
-                if(cpu.state == STATE_RUNNING && cpu.break_next_frame) {
+                if (cpu.state == STATE_RUNNING && cpu.break_next_frame) {
                     cpu.state = STATE_STOPPED;
                     cpu.break_next_frame = false;
                 }
@@ -702,27 +702,33 @@ void try_step_ppu(void) {
         }
         if (ppu.beam_x == 0 && ppu.beam_y == vblank_start) {
             cpu.memory.vblank_has_occurred = true;
+            for (uint8_t i = 0; i < 8; i++) {
+                cpu.memory.dmas[i].dma_byte_count =
+                    (cpu.memory.dmas_for_reloading[0x10 * i + 0x07] << 16) |
+                    (cpu.memory.dmas_for_reloading[0x10 * i + 0x06] << 8) |
+                    (cpu.memory.dmas_for_reloading[0x10 * i + 0x05] << 0);
+                cpu.memory.dmas[i].hdma_current_address =
+                    cpu.memory.dmas[i].dma_src_addr;
+                cpu.memory.dmas[i].scanlines_left = 0;
+                cpu.memory.dmas[i].hdma_repeat = false;
+                cpu.memory.dmas[i].hdma_stopped = false;
+            }
         }
         if (ppu.beam_x == 339 && ppu.beam_y == 261) {
             cpu.memory.vblank_has_occurred = false;
-            for (uint8_t i = 0; i < 8; i++) {
-                if (cpu.memory.dmas[i].hdma_enable) {
-                    cpu.memory.dmas[i].hdma_current_address =
-                        cpu.memory.dmas[i].dma_src_addr;
-                }
-            }
         }
 
         if (ppu.beam_x == 278 && ppu.beam_y > 0 && ppu.beam_y < 225) {
             for (uint8_t i = 0; i < 8; i++) {
-                if (cpu.memory.dmas[i].hdma_enable) {
+                if (cpu.memory.dmas[i].hdma_enable &&
+                    !cpu.memory.dmas[i].hdma_stopped) {
                     if (cpu.memory.dmas[i].scanlines_left == 0) {
                         uint32_t addr = cpu.memory.dmas[i].hdma_current_address;
                         uint8_t next =
                             read_8(U24_LOSHORT(addr), U24_HIBYTE(addr));
                         addr = TO_U24(U24_LOSHORT(addr) + 1, U24_HIBYTE(addr));
                         if (next == 0) {
-                            cpu.memory.dmas[i].hdma_enable = false;
+                            cpu.memory.dmas[i].hdma_stopped = true;
                             continue;
                         }
                         cpu.memory.dmas[i].hdma_repeat = next & 0x80;
@@ -1097,15 +1103,18 @@ void ui(void) {
             cpu.speed /= 2;
         }
 
-        if(IsKeyPressed(KEY_LEFT_ALT)) {
+        if (IsKeyPressed(KEY_LEFT_ALT)) {
             view_scanline = !view_scanline;
         }
 
-        if(view_scanline) {
-            uint32_t scanline_pos = ((ppu.beam_y - 1.f) / WINDOW_HEIGHT) * GetScreenHeight();
-            DrawLine(0, scanline_pos-1, GetScreenWidth(), scanline_pos-1, WHITE);
+        if (view_scanline) {
+            uint32_t scanline_pos =
+                ((ppu.beam_y - 1.f) / WINDOW_HEIGHT) * GetScreenHeight();
+            DrawLine(0, scanline_pos - 1, GetScreenWidth(), scanline_pos - 1,
+                     WHITE);
             DrawLine(0, scanline_pos, GetScreenWidth(), scanline_pos, RED);
-            DrawLine(0, scanline_pos+1, GetScreenWidth(), scanline_pos+1, WHITE);
+            DrawLine(0, scanline_pos + 1, GetScreenWidth(), scanline_pos + 1,
+                     WHITE);
         }
 
         if (view_debug_ui) {

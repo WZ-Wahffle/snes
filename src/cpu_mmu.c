@@ -913,6 +913,7 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                 cpu.memory.dmas[(addr - 0x4300) / 16].transfer_pattern =
                     value & 0b111;
                 cpu.memory.dmas[(addr - 0x4300) / 16].params_raw = value;
+                cpu.memory.dmas_for_reloading[addr - 0x4300] = value;
                 break;
             case 0x4301:
             case 0x4311:
@@ -923,6 +924,7 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
             case 0x4361:
             case 0x4371:
                 cpu.memory.dmas[(addr - 0x4300) / 16].b_bus_addr = value;
+                cpu.memory.dmas_for_reloading[addr - 0x4300] = value;
                 break;
             case 0x4302:
             case 0x4312:
@@ -934,6 +936,7 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
             case 0x4372:
                 cpu.memory.dmas[(addr - 0x4300) / 16].dma_src_addr &= 0xffff00;
                 cpu.memory.dmas[(addr - 0x4300) / 16].dma_src_addr |= value;
+                cpu.memory.dmas_for_reloading[addr - 0x4300] = value;
                 break;
             case 0x4303:
             case 0x4313:
@@ -946,6 +949,7 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                 cpu.memory.dmas[(addr - 0x4300) / 16].dma_src_addr &= 0xff00ff;
                 cpu.memory.dmas[(addr - 0x4300) / 16].dma_src_addr |= value
                                                                       << 8;
+                cpu.memory.dmas_for_reloading[addr - 0x4300] = value;
                 break;
             case 0x4304:
             case 0x4314:
@@ -958,6 +962,7 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                 cpu.memory.dmas[(addr - 0x4300) / 16].dma_src_addr &= 0xffff;
                 cpu.memory.dmas[(addr - 0x4300) / 16].dma_src_addr |= value
                                                                       << 16;
+                cpu.memory.dmas_for_reloading[addr - 0x4300] = value;
                 break;
             case 0x4305:
             case 0x4315:
@@ -970,6 +975,7 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                 cpu.memory.dmas[(addr - 0x4300) / 16].dma_byte_count &=
                     0xffff00;
                 cpu.memory.dmas[(addr - 0x4300) / 16].dma_byte_count |= value;
+                cpu.memory.dmas_for_reloading[addr - 0x4300] = value;
                 break;
             case 0x4306:
             case 0x4316:
@@ -983,6 +989,7 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                     0xff00ff;
                 cpu.memory.dmas[(addr - 0x4300) / 16].dma_byte_count |= value
                                                                         << 8;
+                cpu.memory.dmas_for_reloading[addr - 0x4300] = value;
                 break;
             case 0x4307:
             case 0x4317:
@@ -995,6 +1002,7 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                 cpu.memory.dmas[(addr - 0x4300) / 16].dma_byte_count &= 0xffff;
                 cpu.memory.dmas[(addr - 0x4300) / 16].dma_byte_count |= value
                                                                         << 16;
+                cpu.memory.dmas_for_reloading[addr - 0x4300] = value;
                 break;
             case 0x4308:
             case 0x4318:
@@ -1008,6 +1016,7 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                     0xffff00;
                 cpu.memory.dmas[(addr - 0x4300) / 16].hdma_current_address |=
                     value;
+                cpu.memory.dmas_for_reloading[addr - 0x4300] = value;
                 break;
             case 0x4309:
             case 0x4319:
@@ -1021,6 +1030,7 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                     0xff00ff;
                 cpu.memory.dmas[(addr - 0x4300) / 16].hdma_current_address |=
                     value << 8;
+                cpu.memory.dmas_for_reloading[addr - 0x4300] = value;
                 break;
             case 0x430a:
             case 0x431a:
@@ -1034,6 +1044,7 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                     value & 0x7f;
                 cpu.memory.dmas[(addr - 0x4300) / 16].hdma_repeat =
                     value & 0x80;
+                cpu.memory.dmas_for_reloading[addr - 0x4300] = value;
                 break;
             default:
                 log_message(

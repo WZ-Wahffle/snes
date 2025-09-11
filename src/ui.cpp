@@ -41,7 +41,8 @@ void cpu_window(void) {
                 f.read(reinterpret_cast<char *>(cpu.memory.sram),
                        cpu.memory.sram_size);
             } else {
-                ASSERT(0, (char*)"Expected SRAM size %d, found %d", cpu.memory.sram_size, sram_size);
+                ASSERT(0, (char *)"Expected SRAM size %d, found %d",
+                       cpu.memory.sram_size, sram_size);
             }
             f.close();
             confirm_load = false;
@@ -60,7 +61,7 @@ void cpu_window(void) {
     if (ImGui::Button("Step"))
         cpu.state = STATE_CPU_STEPPED;
     ImGui::SameLine();
-    if(ImGui::Button("Run Scanline")) {
+    if (ImGui::Button("Run Scanline")) {
         cpu.state = STATE_RUNNING;
         cpu.break_next_scanline = true;
     }
@@ -357,6 +358,10 @@ void dma_window(void) {
                     cpu.memory.dmas[dma_selected].scanlines_left);
         ImGui::Text("HDMA Repeat: %s",
                     cpu.memory.dmas[dma_selected].hdma_repeat ? "yes" : "no");
+        ImGui::Text("HDMA Indirect Address: 0x%06x",
+                    cpu.memory.dmas[dma_selected].dma_byte_count);
+        ImGui::Text("HDMA Table Current Address: 0x%06x",
+                    cpu.memory.dmas[dma_selected].hdma_current_address);
         ImGui::Text("HDMA Table Start Address: 0x%06x",
                     cpu.memory.dmas[dma_selected].dma_src_addr);
     } else {
