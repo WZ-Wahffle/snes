@@ -189,6 +189,8 @@ typedef struct {
     uint16_t dividend;
     uint8_t divisor;
     bool doing_div;
+    uint16_t mul_output;
+    uint16_t div_output;
 
     bool joy_auto_read, joy_latch_pending;
     uint16_t joy1l, joy1h, joy1l_latched, joy1h_latched;

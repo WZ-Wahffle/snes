@@ -9,13 +9,10 @@ extern spc_t spc;
 uint32_t lo_rom_resolve(uint32_t addr, bool log) {
     uint32_t ret = addr & 0x7fff;
     ret |= (addr >> 1) & 0b1111111000000000000000;
-    ASSERT(ret < cpu.memory.rom_size,
-           "ROM index 0x%06x larger than size 0x%06x", ret,
-           cpu.memory.rom_size);
     if (log)
         log_message(LOG_LEVEL_VERBOSE,
                     "Resolved LoROM address 0x%06x to 0x%06x", addr, ret);
-    return ret;
+    return ret % cpu.memory.rom_size;
 }
 
 // https://snes.nesdev.org/wiki/Memory_map#HiROM
@@ -134,6 +131,7 @@ uint8_t mmu_read(uint16_t addr, uint8_t bank, bool log) {
                         break;
                     }
                     ppu.oam_addr += 1;
+                    ppu.oam_addr %= 0x220;
                     return ret;
                 } else {
                     uint8_t idx = ppu.oam_addr - 512;
@@ -147,6 +145,7 @@ uint8_t mmu_read(uint16_t addr, uint8_t bank, bool log) {
                           ((ppu.oam[idx * 4 + 3].x >> 8) << 6) |
                           ((ppu.oam[idx * 4 + 3].use_second_size) << 7);
                     ppu.oam_addr += 1;
+                    ppu.oam_addr %= 0x220;
                     return ret;
                 }
             }
@@ -249,31 +248,13 @@ uint8_t mmu_read(uint16_t addr, uint8_t bank, bool log) {
                 return (vblank << 7) | (hblank << 6) | read_in_progress;
             }
             case 0x4214:
-                if (cpu.memory.divisor == 0)
-                    return 0xff;
-                return U16_LOBYTE(cpu.memory.dividend / cpu.memory.divisor);
+                return U16_LOBYTE(cpu.memory.div_output);
             case 0x4215:
-                if (cpu.memory.divisor == 0)
-                    return 0xff;
-                return U16_HIBYTE(cpu.memory.dividend / cpu.memory.divisor);
+                return U16_HIBYTE(cpu.memory.div_output);
             case 0x4216:
-                if (cpu.memory.doing_div) {
-                    if (cpu.memory.divisor == 0)
-                        return cpu.memory.dividend;
-                    return U16_LOBYTE(cpu.memory.dividend % cpu.memory.divisor);
-                } else {
-                    return U16_LOBYTE(cpu.memory.mul_factor_a *
-                                      cpu.memory.mul_factor_b);
-                }
+                return U16_LOBYTE(cpu.memory.mul_output);
             case 0x4217:
-                if (cpu.memory.doing_div) {
-                    if (cpu.memory.divisor == 0)
-                        return cpu.memory.dividend;
-                    return U16_HIBYTE(cpu.memory.dividend % cpu.memory.divisor);
-                } else {
-                    return U16_HIBYTE(cpu.memory.mul_factor_a *
-                                      cpu.memory.mul_factor_b);
-                }
+                return U16_HIBYTE(cpu.memory.mul_output);
             case 0x4218:
                 return U16_LOBYTE(cpu.memory.joy1l);
             case 0x4219:
@@ -401,7 +382,8 @@ uint8_t mmu_read(uint16_t addr, uint8_t bank, bool log) {
         return cpu.memory.ram[(bank - 0x7e) * 0x10000 + addr];
     }
 
-    ASSERT(0, "Tried to read from bank 0x%02x, address 0x%04x", bank, addr);
+    log_message(LOG_LEVEL_WARNING, "Tried to read from bank 0x%02x, address 0x%04x", bank, addr);
+    return 0;
 }
 
 static uint8_t transfer_patterns[8][4] = {
@@ -438,10 +420,12 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
             case 0x2102:
                 ppu.oam_addr &= ~0x1ff;
                 ppu.oam_addr |= (value << 1);
+                ppu.oam_addr %= 0x220;
                 break;
             case 0x2103:
                 ppu.oam_addr &= ~0x200;
                 ppu.oam_addr |= (value & 1) << 9;
+                ppu.oam_addr %= 0x220;
                 ppu.oam_priority_rotation = value & 0x80;
                 break;
             case 0x2104:
@@ -474,6 +458,7 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                     }
                 }
                 ppu.oam_addr++;
+                ppu.oam_addr %= 0x220;
                 break;
             case 0x2105:
                 ppu.bg_mode = value & 0b111;
@@ -595,27 +580,31 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                 ppu.a_7_buffer = (value << 8) | ppu.mode_7_latch;
                 ppu.mode_7_latch = value;
                 ppu.a_7 = ppu.a_7_buffer / 256.f;
-                if(ppu.a_7_buffer & 0x8000) ppu.a_7 -= 256.f;
+                if (ppu.a_7_buffer & 0x8000)
+                    ppu.a_7 -= 256.f;
                 ppu.mul_factor_1 = ppu.a_7_buffer;
                 break;
             case 0x211c:
                 ppu.b_7_buffer = (value << 8) | ppu.mode_7_latch;
                 ppu.mode_7_latch = value;
                 ppu.b_7 = ppu.b_7_buffer / 256.f;
-                if(ppu.b_7_buffer & 0x8000) ppu.b_7 -= 256.f;
+                if (ppu.b_7_buffer & 0x8000)
+                    ppu.b_7 -= 256.f;
                 ppu.mul_factor_2 = value;
                 break;
             case 0x211d:
                 ppu.c_7_buffer = (value << 8) | ppu.mode_7_latch;
                 ppu.mode_7_latch = value;
                 ppu.c_7 = ppu.c_7_buffer / 256.f;
-                if(ppu.c_7_buffer & 0x8000) ppu.c_7 -= 256.f;
+                if (ppu.c_7_buffer & 0x8000)
+                    ppu.c_7 -= 256.f;
                 break;
             case 0x211e:
                 ppu.d_7_buffer = (value << 8) | ppu.mode_7_latch;
                 ppu.mode_7_latch = value;
                 ppu.d_7 = ppu.d_7_buffer / 256.f;
-                if(ppu.d_7_buffer & 0x8000) ppu.d_7 -= 256.f;
+                if (ppu.d_7_buffer & 0x8000)
+                    ppu.d_7 -= 256.f;
                 break;
             case 0x211f:
                 ppu.mode_7_center_x = (value << 8) | ppu.mode_7_latch;
@@ -813,7 +802,8 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                 break;
             case 0x4203:
                 cpu.memory.mul_factor_b = value;
-                cpu.memory.doing_div = false;
+                cpu.memory.mul_output =
+                    cpu.memory.mul_factor_a * cpu.memory.mul_factor_b;
                 break;
             case 0x4204:
                 cpu.memory.dividend &= 0xff00;
@@ -825,7 +815,12 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                 break;
             case 0x4206:
                 cpu.memory.divisor = value;
-                cpu.memory.doing_div = true;
+                cpu.memory.div_output =
+                    value == 0 ? 0xffff
+                               : cpu.memory.dividend / cpu.memory.divisor;
+                cpu.memory.mul_output =
+                    value == 0 ? cpu.memory.dividend
+                               : cpu.memory.dividend % cpu.memory.divisor;
                 break;
             case 0x4207:
                 ppu.h_timer_target &= 0x100;
@@ -900,6 +895,22 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                             cpu.memory.dmas[i].dma_src_addr;
                     }
                 }
+                break;
+            case 0x4214:
+                cpu.memory.div_output =
+                    TO_U16(value, U16_HIBYTE(cpu.memory.div_output));
+                break;
+            case 0x4215:
+                cpu.memory.div_output =
+                    TO_U16(U16_LOBYTE(cpu.memory.div_output), value);
+                break;
+            case 0x4216:
+                cpu.memory.mul_output =
+                    TO_U16(value, U16_HIBYTE(cpu.memory.mul_output));
+                break;
+            case 0x4217:
+                cpu.memory.mul_output =
+                    TO_U16(U16_LOBYTE(cpu.memory.mul_output), value);
                 break;
             case 0x4300:
             case 0x4310:

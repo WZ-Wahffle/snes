@@ -282,6 +282,7 @@ void oam_window(void) {
     ImGui::Text("ALT Nametable: 0x%04x", (ppu.obj_name_base_address << 14) +
                                              ((ppu.obj_name_select + 1) << 13));
     ImGui::Text("Sprite size index: %d", ppu.obj_sprite_size);
+    ImGui::Text("OAM Address: 0x%04x", ppu.oam_addr);
     if (ImGui::BeginTable("##oam", 6,
                           ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
         ImGui::TableSetupColumn("X", ImGuiTableColumnFlags_WidthFixed);
