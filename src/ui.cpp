@@ -188,6 +188,8 @@ void ppu_window(void) {
     ImGui::Text("Color Math Sub Transparent: %s",
                 region_types[ppu.sub_window_transparent_region].c_str());
     if (ppu.bg_mode == 7) {
+        ImGui::Text("M7 X: %d", ppu.mode_7_center_x);
+        ImGui::Text("M7 Y: %d", ppu.mode_7_center_y);
         ImGui::Text("M7 right -> right: %f", ppu.a_7);
         ImGui::Text("M7 down -> right: %f", ppu.b_7);
         ImGui::Text("M7 right -> down: %f", ppu.c_7);

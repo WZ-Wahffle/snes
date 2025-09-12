@@ -427,9 +427,6 @@ void draw_bg(uint8_t bg_idx, uint16_t y, color_depth_t bpp, uint8_t low_prio,
             priority[screen_y * WINDOW_WIDTH + screen_x] <
                 (prio ? high_prio : low_prio)) {
             if (blocked && ppu.bg_config[bg_idx].main_window_enable) {
-                target[screen_x] = 0xff000000;
-                priority[screen_y * WINDOW_WIDTH + screen_x] =
-                    prio ? high_prio : low_prio;
                 continue;
             }
 
@@ -479,10 +476,14 @@ void draw_bg_1_mode_7(int16_t y) {
     for (int16_t screen_x = 0; screen_x < WINDOW_WIDTH; screen_x++) {
         int16_t x = ppu.mode_7_center_x;
         y = ppu.mode_7_center_y;
-        x += (screen_x - ppu.mode_7_center_x) * ppu.a_7 +
-             (screen_y - ppu.mode_7_center_y) * ppu.b_7;
-        y += (screen_x - ppu.mode_7_center_x) * ppu.c_7 +
-             (screen_y - ppu.mode_7_center_y) * ppu.d_7;
+        x += (screen_x + ppu.bg_config[0].h_scroll - ppu.mode_7_center_x) *
+                 ppu.a_7 +
+             (screen_y + ppu.bg_config[0].v_scroll - ppu.mode_7_center_y) *
+                 ppu.b_7;
+        y += (screen_x + ppu.bg_config[0].h_scroll - ppu.mode_7_center_x) *
+                 ppu.c_7 +
+             (screen_y + ppu.bg_config[0].v_scroll - ppu.mode_7_center_y) *
+                 ppu.d_7;
         if (x < 0 || y < 0 || x >= 1024 || y >= 1024) {
             if (ppu.mode_7_tilemap_repeat) {
                 x %= 1024;
@@ -502,14 +503,54 @@ void draw_bg_1_mode_7(int16_t y) {
         if (ppu.bg_config[0].enable_mosaic) {
             x -= x % (ppu.mosaic_size + 1);
         }
+
+        bool window_1 = false;
+        if (ppu.bg_config[0].window_1_enable) {
+            window_1 = IN_INTERVAL(screen_x, ppu.window_1_l, ppu.window_1_r) ^
+                       ppu.bg_config[0].window_1_invert;
+        }
+        bool window_2 = false;
+        if (ppu.bg_config[0].window_2_enable) {
+            window_2 = IN_INTERVAL(screen_x, ppu.window_2_l, ppu.window_2_r) ^
+                       ppu.bg_config[0].window_2_invert;
+        }
+
+        bool blocked;
+        if (!ppu.bg_config[0].window_1_enable &&
+            !ppu.bg_config[0].window_2_enable) {
+            blocked = false;
+        } else if (ppu.bg_config[0].window_1_enable &&
+                   !ppu.bg_config[0].window_2_enable) {
+            blocked = window_1;
+        } else if (!ppu.bg_config[0].window_1_enable &&
+                   ppu.bg_config[0].window_2_enable) {
+            blocked = window_2;
+        } else
+            switch (ppu.bg_config[0].mask_logic) {
+            case 0:
+                blocked = window_1 || window_2;
+                break;
+            case 1:
+                blocked = window_1 && window_2;
+                break;
+            case 2:
+                blocked = window_1 ^ window_2;
+                break;
+            case 3:
+                blocked = window_1 == window_2;
+                break;
+            default:
+                UNREACHABLE_SWITCH(ppu.bg_config[0].mask_logic);
+            }
+
         uint16_t tile_number = (y / 8) * 128 + (x / 8);
         uint16_t tile_idx = ppu.vram[tile_number * 2];
         uint8_t palette_idx =
             ppu.vram[tile_idx * 128 + (2 * (x % 8)) + (2 * (y % 8) * 8) + 1];
-        if (ppu.bg_config[0].main_screen_enable)
-            target[screen_x] = ppu.cgram[palette_idx];
-        if (ppu.bg_config[0].sub_screen_enable)
-            target_sub[screen_x] = ppu.cgram[palette_idx];
+        if (ppu.bg_config[0].main_screen_enable && !blocked)
+            target[screen_x] = brightness_adjust(ppu.cgram[palette_idx]);
+        if (ppu.bg_config[0].sub_screen_enable && !blocked)
+            target_sub[screen_x] = brightness_adjust(ppu.cgram[palette_idx]);
     }
 }
 
@@ -622,8 +663,6 @@ void draw_obj(uint16_t y) {
                     if (x < 0 || x > 255)
                         continue;
                     if (blocked && ppu.obj_main_window_enable) {
-                        target[x] = 0xff000000;
-                        priority[y * WINDOW_WIDTH + x] = prio;
                         continue;
                     }
 
@@ -633,7 +672,8 @@ void draw_obj(uint16_t y) {
                                       tiles[x_off]]);
                         target[x] = col;
                         priority[y * WINDOW_WIDTH + x] = prio;
-                        use_color_math[x] = ppu.obj_color_math_enable;
+                        use_color_math[x] =
+                            ppu.obj_color_math_enable && ppu.oam[i].palette > 3;
                     }
                 }
 
@@ -816,14 +856,16 @@ void try_step_ppu(void) {
         if (ppu.beam_x == 22 && ppu.beam_y > 0 && ppu.beam_y < 225) {
             if (ppu.force_blanking)
                 return;
+            uint32_t main_bg_adj = brightness_adjust(ppu.cgram[0]);
+            uint32_t sub_bg_adj = brightness_adjust(ppu.fixed_color_24bit);
             for (uint16_t i = 0; i < WINDOW_WIDTH; i++) {
                 ((uint32_t *)framebuffer)[(ppu.beam_y - 1) * WINDOW_WIDTH + i] =
-                    ppu.fixed_color_24bit;
+                    main_bg_adj;
                 ((uint32_t *)subscreen)[(ppu.beam_y - 1) * WINDOW_WIDTH + i] =
-                    ppu.fixed_color_24bit;
+                    sub_bg_adj;
                 priority[(ppu.beam_y - 1) * WINDOW_WIDTH + i] = 0;
                 priority_sub[(ppu.beam_y - 1) * WINDOW_WIDTH + i] = 0;
-                use_color_math[i] = 0;
+                use_color_math[i] = ppu.backdrop_color_math_enable;
             }
             if (ppu.bg_mode == 0) {
                 draw_bg(0, ppu.beam_y - 1, BPP_2, 7, 10);
@@ -978,13 +1020,6 @@ void try_step_ppu(void) {
                     ((uint32_t *)
                          framebuffer)[(ppu.beam_y - 1) * WINDOW_WIDTH + i] =
                         r | (g << 8) | (b << 16) | 0xff000000;
-                }
-
-                if (priority[(ppu.beam_y - 1) * WINDOW_WIDTH + i] == 0) {
-                    ((uint32_t *)
-                         framebuffer)[(ppu.beam_y - 1) * WINDOW_WIDTH + i] =
-                        ((uint32_t *)
-                             subscreen)[(ppu.beam_y - 1) * WINDOW_WIDTH + i];
                 }
             }
         }

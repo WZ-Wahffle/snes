@@ -595,23 +595,27 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                 ppu.a_7_buffer = (value << 8) | ppu.mode_7_latch;
                 ppu.mode_7_latch = value;
                 ppu.a_7 = ppu.a_7_buffer / 256.f;
+                if(ppu.a_7_buffer & 0x8000) ppu.a_7 -= 256.f;
                 ppu.mul_factor_1 = ppu.a_7_buffer;
                 break;
             case 0x211c:
                 ppu.b_7_buffer = (value << 8) | ppu.mode_7_latch;
                 ppu.mode_7_latch = value;
                 ppu.b_7 = ppu.b_7_buffer / 256.f;
+                if(ppu.b_7_buffer & 0x8000) ppu.b_7 -= 256.f;
                 ppu.mul_factor_2 = value;
                 break;
             case 0x211d:
                 ppu.c_7_buffer = (value << 8) | ppu.mode_7_latch;
                 ppu.mode_7_latch = value;
                 ppu.c_7 = ppu.c_7_buffer / 256.f;
+                if(ppu.c_7_buffer & 0x8000) ppu.c_7 -= 256.f;
                 break;
             case 0x211e:
                 ppu.d_7_buffer = (value << 8) | ppu.mode_7_latch;
                 ppu.mode_7_latch = value;
                 ppu.d_7 = ppu.d_7_buffer / 256.f;
+                if(ppu.d_7_buffer & 0x8000) ppu.d_7 -= 256.f;
                 break;
             case 0x211f:
                 ppu.mode_7_center_x = (value << 8) | ppu.mode_7_latch;

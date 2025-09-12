@@ -10,3 +10,6 @@ imgui.ini
 in/
 *.o
 .zed/
+flamegraph.svg
+perf.data
+perf.data.old
