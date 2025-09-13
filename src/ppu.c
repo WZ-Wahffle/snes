@@ -753,6 +753,7 @@ void try_step_ppu(void) {
                 cpu.memory.dmas[i].hdma_repeat = false;
                 cpu.memory.dmas[i].hdma_stopped = false;
             }
+            if(!ppu.force_blanking) ppu.oam_addr_internal = ppu.oam_addr;
         }
         if (ppu.beam_x == 339 && ppu.beam_y == 261) {
             cpu.memory.vblank_has_occurred = false;

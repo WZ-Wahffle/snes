@@ -384,7 +384,7 @@ typedef struct {
     uint8_t obj_sprite_size;
     uint8_t obj_name_select;
     uint8_t obj_name_base_address;
-    uint16_t oam_addr;
+    uint16_t oam_addr, oam_addr_internal;
     bool oam_priority_rotation;
     uint8_t oam_latch;
     bool oam_sprite_overflow;
