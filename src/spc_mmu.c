@@ -210,6 +210,8 @@ void spc_mmu_write(uint16_t addr, uint8_t val, bool log) {
                     break;
                 case 0x3d:
                     spc.memory.use_noise = val;
+                    for (uint8_t i = 0; i < 8; i++)
+                        spc.memory.channels[i].noise_enable = val & (1 << i);
                     break;
                 case 0x4d:
                     spc.memory.echo_enable = val;

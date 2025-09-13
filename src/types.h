@@ -231,6 +231,7 @@ typedef struct {
     uint16_t pitch;
     uint8_t sample_source_directory;
     bool adsr_enable;
+    bool noise_enable;
     uint8_t a_rate, d_rate, s_level, s_rate;
     uint8_t gain;
     uint16_t t;

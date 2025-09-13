@@ -1,6 +1,7 @@
 #include "apu.h"
 #include "raylib.h"
 #include "types.h"
+#include <math.h>
 
 extern cpu_t cpu;
 extern spc_t spc;
@@ -96,9 +97,33 @@ void audio_cb(void *buffer, unsigned int count) {
         1303, 1304, 1304, 1304, 1304, 1304, 1305, 1305,
     };
 
+    static const float noise_generator_frequencies[] = {
+        INFINITY,      1.f / 16.f,    1.f / 21.f,   1.f / 25.f,   1.f / 31.f,
+        1.f / 42.f,    1.f / 50.f,    1.f / 63.f,   1.f / 83.f,   1.f / 100.f,
+        1.f / 125.f,   1.f / 167.f,   1.f / 200.f,  1.f / 250.f,  1.f / 333.f,
+        1.f / 400.f,   1.f / 500.f,   1.f / 667.f,  1.f / 800.f,  1.f / 1000.f,
+        1.f / 1300.f,  1.f / 1600.f,  1.f / 2000.f, 1.f / 2700.f, 1.f / 3200.f,
+        1.f / 4000.f,  1.f / 5300.f,  1.f / 6400.f, 1.f / 8000.f, 1.f / 10700.f,
+        1.f / 16000.f, 1.f / 32000.f,
+    };
+
     uint16_t *out = buffer;
     static uint16_t smp_counter = 0;
+    static uint16_t noise_generator = 0x4000;
+    static float noise_generator_timer = 0;
     for (uint32_t buffer_idx = 0; buffer_idx < count; buffer_idx++) {
+        if (spc.memory.noise_freq != 0) {
+            noise_generator_timer += 1.f / SAMPLE_RATE;
+            while (noise_generator_timer >
+                   noise_generator_frequencies[spc.memory.noise_freq]) {
+                noise_generator =
+                    (noise_generator >> 1) |
+                    (((noise_generator << 14) ^ (noise_generator << 13)) &
+                     0x4000);
+                noise_generator_timer -=
+                    noise_generator_frequencies[spc.memory.noise_freq];
+            }
+        }
         for (uint8_t channel_idx = 0; channel_idx < 8; channel_idx++) {
             dsp_channel_t *chan = &spc.memory.channels[channel_idx];
             if (!chan->playing && !chan->key_on) {
@@ -250,7 +275,11 @@ void audio_cb(void *buffer, unsigned int count) {
                     gauss_lut[table_idx] * chan->sample_buffer[(idx + 3) % 12];
                 result >>= 11;
 
-                chan->output = result;
+                if (spc.memory.use_noise & (1 << channel_idx)) {
+                    chan->output = noise_generator;
+                } else {
+                    chan->output = result;
+                }
             }
             // checking if 4 sample points have been passed
             if (chan->points_passed_since_refill >= 4) {

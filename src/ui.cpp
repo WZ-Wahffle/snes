@@ -670,6 +670,8 @@ void dsp_window(void) {
     ImGui::Text("Pitch: %d", spc.memory.channels[dsp_selected].pitch);
     ImGui::Text("Sample Source Directory: 0x%02x",
                 spc.memory.channels[dsp_selected].sample_source_directory);
+    ImGui::Text("Use Noise Generator: %s", spc.memory.channels[dsp_selected].noise_enable ? "true" : "false");
+    ImGui::Text("Noise Frequency Index: %d", spc.memory.noise_freq);
     ImGui::Text("ADSR %sabled",
                 spc.memory.channels[dsp_selected].adsr_enable ? "en" : "dis");
     if (spc.memory.channels[dsp_selected].adsr_enable) {
