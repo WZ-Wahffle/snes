@@ -486,6 +486,8 @@ void draw_bg_1_mode_7(int16_t y) {
                  ppu.d_7;
         if (x < 0 || y < 0 || x >= 1024 || y >= 1024) {
             if (ppu.mode_7_tilemap_repeat) {
+                while(x < 0) x += 1024;
+                while(y < 0) y += 1024;
                 x %= 1024;
                 y %= 1024;
             } else {
