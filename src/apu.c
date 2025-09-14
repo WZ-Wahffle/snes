@@ -162,6 +162,7 @@ void audio_cb(void *buffer, unsigned int count) {
                 }
                 chan->remaining_values_in_block = 4;
                 chan->refill_idx = 0;
+                chan->points_passed_since_refill = 0;
             }
 
             static const uint16_t period[] = {

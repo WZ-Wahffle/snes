@@ -69,15 +69,16 @@ static cart_hash_t rom_hash_lookup[] = {
     {"SNES SPC Test", 0xb9a70b6a, LOROM},
     {"Earthbound", 0xb4975b60, HIROM},
     {"Puzzle Bobble", 0xc1a14c71, LOROM},
-    {"Super Mario RPG", 0x834c11c2, LOROM},
-    {"Super Mario Kart", 0x2202b32f, HIROM},
     {"Control Test Auto", 0xdd642b6a, LOROM},
     {"Control Test Simple", 0xc0467d5c, LOROM},
     {"Donkey Kong Country", 0xc1a8ad4c, HIROM},
     {"Aging Test ROM", 0x35a123c5, LOROM},
     {"Burn In Test ROM", 0x660892f8, LOROM},
     {"Harvest Moon", 0xe39158fd, LOROM},
-    {"The Legend Of Zelda: A Link To The Past", 0x5c289c1c, LOROM}
+    {"The Legend Of Zelda: A Link To The Past", 0x5c289c1c, LOROM},
+    {"Mega Man X", 0xcb111768, LOROM},
+    {"Chrono Trigger", 0x12183f9, HIROM},
+    {"Kirby's Dream Course", 0x859f36cd, LOROM},
 };
 
 void at_exit(void) {

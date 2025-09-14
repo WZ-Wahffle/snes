@@ -202,6 +202,8 @@ void spc_mmu_write(uint16_t addr, uint8_t val, bool log) {
                     spc.memory.disable_echo_write = val & 0x20;
                     spc.memory.noise_freq = val & 0x1f;
                     break;
+                case 0x7c:
+                    break;
                 case 0x0d:
                     spc.memory.echo_feedback = val;
                     break;
@@ -226,7 +228,8 @@ void spc_mmu_write(uint16_t addr, uint8_t val, bool log) {
                     spc.memory.echo_delay = val & 0xf;
                     break;
                 default:
-                    UNREACHABLE_SWITCH(spc.memory.dsp_addr);
+                log_message(LOG_LEVEL_WARNING, "Tried to write 0x%02x to DSP address 0x%02x", val, spc.memory.dsp_addr);
+                    // UNREACHABLE_SWITCH(spc.memory.dsp_addr);
                 }
             } else {
                 switch (spc.memory.dsp_addr % 16) {

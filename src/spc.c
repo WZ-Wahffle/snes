@@ -256,6 +256,12 @@ void spc_execute(void) {
     case 0x05:
         spc_ora(SM_ABS);
         break;
+    case 0x06:
+        spc_ora(SM_INDIRECT);
+        break;
+    case 0x07:
+        spc_ora(SM_INDX);
+        break;
     case 0x08:
         spc_ora(SM_IMM);
         break;
@@ -292,11 +298,23 @@ void spc_execute(void) {
     case 0x13:
         spc_bbc0(SM_DIR_PAGE_BIT_REL);
         break;
+    case 0x14:
+        spc_ora(SM_DIR_PAGEX);
+        break;
     case 0x15:
-        spc_ora(SM_ABSY);
+        spc_ora(SM_ABSX);
         break;
     case 0x16:
         spc_ora(SM_ABSY);
+        break;
+    case 0x17:
+        spc_ora(SM_INDY);
+        break;
+    case 0x18:
+        spc_ora(SM_IMM_TO_DIR_PAGE);
+        break;
+    case 0x19:
+        spc_ora(SM_IND_PAGE_TO_IND_PAGE);
         break;
     case 0x1a:
         spc_dew(SM_DIR_PAGE);

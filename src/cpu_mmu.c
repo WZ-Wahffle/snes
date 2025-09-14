@@ -230,6 +230,10 @@ uint8_t mmu_read(uint16_t addr, uint8_t bank, bool log) {
                 cpu.memory.joy2_shift_idx++;
                 return ret;
             }
+            case 0x4202:
+                return cpu.memory.mul_factor_a;
+            case 0x4203:
+                return cpu.memory.mul_factor_b;
             case 0x4210: {
                 bool ret = cpu.memory.vblank_has_occurred;
                 cpu.memory.vblank_has_occurred = false;
@@ -382,7 +386,8 @@ uint8_t mmu_read(uint16_t addr, uint8_t bank, bool log) {
         return cpu.memory.ram[(bank - 0x7e) * 0x10000 + addr];
     }
 
-    log_message(LOG_LEVEL_WARNING, "Tried to read from bank 0x%02x, address 0x%04x", bank, addr);
+    log_message(LOG_LEVEL_WARNING,
+                "Tried to read from bank 0x%02x, address 0x%04x", bank, addr);
     return 0;
 }
 
@@ -434,7 +439,8 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                 if ((ppu.oam_addr_internal & 1) == 0) {
                     ppu.oam_latch = value;
                 }
-                if (ppu.oam_addr_internal < 0x200 && (ppu.oam_addr_internal & 1)) {
+                if (ppu.oam_addr_internal < 0x200 &&
+                    (ppu.oam_addr_internal & 1)) {
                     uint8_t oam_idx = ppu.oam_addr_internal / 4;
                     if (ppu.oam_addr_internal % 4 == 1) {
                         ppu.oam[oam_idx].x &= 0xff00;
@@ -452,11 +458,12 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                 }
                 if (ppu.oam_addr_internal >= 0x200) {
                     for (uint8_t i = 0; i < 4; i++) {
-                        ppu.oam[(ppu.oam_addr_internal % 0x20) * 4 + i].x &= 0xff;
+                        ppu.oam[(ppu.oam_addr_internal % 0x20) * 4 + i].x &=
+                            0xff;
                         ppu.oam[(ppu.oam_addr_internal % 0x20) * 4 + i].x |=
                             ((value >> (i * 2)) & 1) << 8;
-                        ppu.oam[(ppu.oam_addr_internal % 0x20) * 4 + i].use_second_size =
-                            (value >> (i * 2 + 1)) & 1;
+                        ppu.oam[(ppu.oam_addr_internal % 0x20) * 4 + i]
+                            .use_second_size = (value >> (i * 2 + 1)) & 1;
                     }
                 }
                 ppu.oam_addr_internal++;
@@ -898,6 +905,9 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                     }
                 }
                 break;
+            case 0x420d:
+                // who needs fastROM when all ROM is fast
+                break;
             case 0x4214:
                 cpu.memory.div_output =
                     TO_U16(value, U16_HIBYTE(cpu.memory.div_output));
@@ -1071,7 +1081,7 @@ void mmu_write(uint16_t addr, uint8_t bank, uint8_t value, bool log) {
                 return;
             }
         } else {
-            TODO("expansion write");
+            log_message(LOG_LEVEL_WARNING, "Tried to write 0x%02x to expansion address 0x%04x", value, addr);
         }
     } else if (bank == 0x7e || bank == 0x7f) {
         ASSERT(
